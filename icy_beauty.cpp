@@ -32,6 +32,7 @@ enum SoundParameter {
 struct Voice {
     uint32_t fundamentalPhase;
     uint32_t glassPhase;
+    uint32_t shimmerPhase;
     uint32_t motionPhase;
     uint32_t basePhaseIncrement;
     uint32_t phaseIncrement;
@@ -223,6 +224,7 @@ void calculateRequirements(_NT_algorithmRequirements& requirements,
 void clearVoice(Voice& voice) {
     voice.fundamentalPhase = 0;
     voice.glassPhase = 0x40000000U;
+    voice.shimmerPhase = 0x80000000U;
     voice.motionPhase = 0;
     voice.basePhaseIncrement = 0;
     voice.phaseIncrement = 0;
@@ -314,6 +316,7 @@ void startVoice(IcyBeautyDtc* dtc, Voice& voice, uint8_t source,
                 uint32_t basePhaseIncrement, float velocity) {
     voice.fundamentalPhase = 0;
     voice.glassPhase = 0x40000000U;
+    voice.shimmerPhase = 0x80000000U;
     voice.basePhaseIncrement = basePhaseIncrement;
     voice.phaseIncrement = source == kVoiceMidi
                                ? static_cast<uint32_t>(
@@ -545,10 +548,11 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
                                  ? 48000.0f
                                  : static_cast<float>(NT_globals.sampleRate);
     const float toneCoefficient = 0.025f + 0.55f * tone * tone;
-    const float fundamentalLevel = 0.82f - 0.28f * tone;
-    const float glassLevel = 0.18f + 0.28f * tone;
+    const float fundamentalLevel = 0.84f - 0.18f * tone;
+    const float glassLevel = 0.035f + 0.095f * tone;
+    const float shimmerLevel = 0.28f + 0.54f * tone;
     const float grainDepth = grain * grain;
-    const float releaseSeconds = 0.08f * exp2f(6.64385619f * release);
+    const float releaseSeconds = 0.08f + 12.0f * release * release;
     const float releaseRate =
         13.815510558f / (sampleRate * releaseSeconds);
     float resonanceAmount[kMaxVoices];
@@ -586,7 +590,7 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     }
 
     static const float kVoiceGain[kMaxVoices] = {
-        3.5f, 2.47f, 2.02f, 1.75f, 1.56f, 1.43f, 1.32f, 1.24f,
+        0.63f, 0.445f, 0.364f, 0.315f, 0.281f, 0.257f, 0.238f, 0.223f,
     };
     const float voiceGain = kVoiceGain[algorithm->voiceCount - 1];
 
@@ -616,18 +620,23 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             voice.fundamentalPhase += modulatedIncrement;
             voice.glassPhase += modulatedIncrement * 2U +
                                 modulatedIncrement / 127U;
+            voice.shimmerPhase += modulatedIncrement * 2U +
+                                  modulatedIncrement / 2U +
+                                  modulatedIncrement / 127U;
 
             const float target = voice.gate ? 1.0f : 0.0f;
-            const float envelopeRate = voice.gate ? 0.0045f : releaseRate;
+            const float envelopeRate = voice.gate ? 0.0015f : releaseRate;
             voice.envelope += envelopeRate * (target - voice.envelope);
 
-            const float velocityBrightness = 0.1f * voice.velocity;
+            const float velocityBrightness = 0.06f * voice.velocity;
             const float raw =
-                (fundamentalLevel - 0.4f * velocityBrightness) *
+                (fundamentalLevel - 0.1f * velocityBrightness) *
                     triangle(voice.fundamentalPhase) +
-                (glassLevel + velocityBrightness) *
+                (glassLevel + 0.25f * velocityBrightness) *
                     triangle(voice.glassPhase) +
-                0.14f * grainDepth * noise;
+                (shimmerLevel + velocityBrightness) *
+                    triangle(voice.shimmerPhase) +
+                0.12f * grainDepth * noise;
             const float voiceToneCoefficient =
                 toneCoefficient + 0.08f * voice.velocity;
             voice.toneState +=
@@ -650,7 +659,16 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
                 clearVoice(voice);
         }
 
-        const float sample = voiceGain * mixed;
+        const float unboundedSample = voiceGain * mixed;
+        const float magnitude = unboundedSample < 0.0f
+                                    ? -unboundedSample
+                                    : unboundedSample;
+        float sample = unboundedSample;
+        if (magnitude > 0.9f) {
+            const float excess = magnitude - 0.9f;
+            const float limited = 0.9f + 0.08f * excess / (1.0f + excess);
+            sample = unboundedSample < 0.0f ? -limited : limited;
+        }
         output[frame] = replace ? sample : output[frame] + sample;
     }
 }

@@ -1,0 +1,739 @@
+{
+  "analysis_version": 1,
+  "events": [
+    {
+      "envelope": {
+        "attack_10_to_90_ms": 37.35,
+        "energy_step_db": 12.71,
+        "peak_delay_ms": 61.02,
+        "rms_0_to_200ms_dbfs": -20.32,
+        "rms_500_to_700ms_relative_db": -8.66,
+        "rms_900_to_1100ms_relative_db": -9.64
+      },
+      "index": 1,
+      "inferred_root": {
+        "added_power_db": 25.84,
+        "alternatives": [
+          {
+            "added_power_db": 25.84,
+            "midi": 50,
+            "note": "D3"
+          },
+          {
+            "added_power_db": 25.37,
+            "midi": 49,
+            "note": "C#3"
+          },
+          {
+            "added_power_db": 20.48,
+            "midi": 51,
+            "note": "D#3"
+          }
+        ],
+        "frequency_hz": 146.832,
+        "midi": 50,
+        "note": "D3"
+      },
+      "onset_slope_db": 6.99,
+      "polyphonic_notes_near_onset": [
+        {
+          "confidence": 0.486,
+          "duration_seconds": 1.01,
+          "midi": 50,
+          "note": "D3",
+          "start_seconds": 13.115
+        },
+        {
+          "confidence": 0.341,
+          "duration_seconds": 0.186,
+          "midi": 54,
+          "note": "F#3",
+          "start_seconds": 13.115
+        },
+        {
+          "confidence": 0.568,
+          "duration_seconds": 0.639,
+          "midi": 66,
+          "note": "F#4",
+          "start_seconds": 13.115
+        },
+        {
+          "confidence": 0.498,
+          "duration_seconds": 0.673,
+          "midi": 73,
+          "note": "C#5",
+          "start_seconds": 13.08
+        }
+      ],
+      "spectrum": {
+        "added_85_percent_rolloff_hz": 556.6,
+        "added_spectral_centroid_hz": 346.1,
+        "harmonic_band_power_fraction": 0.2907,
+        "harmonics_relative_db": [
+          0.0,
+          -10.39,
+          -24.56,
+          -21.94,
+          -14.56,
+          -40.11,
+          -33.5,
+          -41.07
+        ],
+        "measured_fundamental_hz": 146.484,
+        "non_harmonic_or_layer_power_fraction": 0.7093,
+        "pitch_offset_cents": -4.11
+      },
+      "stereo": {
+        "left_right_correlation": 0.7923,
+        "side_to_mid_db": -8.7
+      },
+      "time_seconds": 13.093
+    },
+    {
+      "envelope": {
+        "attack_10_to_90_ms": 25.65,
+        "energy_step_db": 9.99,
+        "peak_delay_ms": 102.92,
+        "rms_0_to_200ms_dbfs": -23.54,
+        "rms_500_to_700ms_relative_db": -3.6,
+        "rms_900_to_1100ms_relative_db": -9.01
+      },
+      "index": 2,
+      "inferred_root": {
+        "added_power_db": 33.61,
+        "alternatives": [
+          {
+            "added_power_db": 33.61,
+            "midi": 54,
+            "note": "F#3"
+          },
+          {
+            "added_power_db": 31.65,
+            "midi": 53,
+            "note": "F3"
+          },
+          {
+            "added_power_db": 27.41,
+            "midi": 55,
+            "note": "G3"
+          }
+        ],
+        "frequency_hz": 184.997,
+        "midi": 54,
+        "note": "F#3"
+      },
+      "onset_slope_db": 5.46,
+      "polyphonic_notes_near_onset": [
+        {
+          "confidence": 0.623,
+          "duration_seconds": 0.337,
+          "midi": 54,
+          "note": "F#3",
+          "start_seconds": 15.508
+        },
+        {
+          "confidence": 0.393,
+          "duration_seconds": 0.522,
+          "midi": 61,
+          "note": "C#4",
+          "start_seconds": 15.473
+        },
+        {
+          "confidence": 0.582,
+          "duration_seconds": 0.476,
+          "midi": 69,
+          "note": "A4",
+          "start_seconds": 15.497
+        }
+      ],
+      "spectrum": {
+        "added_85_percent_rolloff_hz": 448.2,
+        "added_spectral_centroid_hz": 346.2,
+        "harmonic_band_power_fraction": 0.338,
+        "harmonics_relative_db": [
+          0.0,
+          -6.73,
+          -7.08,
+          -165.03,
+          -29.71,
+          -26.41,
+          -26.01,
+          -33.6
+        ],
+        "measured_fundamental_hz": 184.57,
+        "non_harmonic_or_layer_power_fraction": 0.662,
+        "pitch_offset_cents": -4.0
+      },
+      "stereo": {
+        "left_right_correlation": 0.7846,
+        "side_to_mid_db": -8.95
+      },
+      "time_seconds": 15.488
+    },
+    {
+      "envelope": {
+        "attack_10_to_90_ms": 38.04,
+        "energy_step_db": 10.25,
+        "peak_delay_ms": 30.19,
+        "rms_0_to_200ms_dbfs": -20.63,
+        "rms_500_to_700ms_relative_db": -7.69,
+        "rms_900_to_1100ms_relative_db": -9.96
+      },
+      "index": 3,
+      "inferred_root": {
+        "added_power_db": 18.17,
+        "alternatives": [
+          {
+            "added_power_db": 18.17,
+            "midi": 47,
+            "note": "B2"
+          },
+          {
+            "added_power_db": 16.3,
+            "midi": 46,
+            "note": "A#2"
+          },
+          {
+            "added_power_db": 13.38,
+            "midi": 48,
+            "note": "C3"
+          }
+        ],
+        "frequency_hz": 123.471,
+        "midi": 47,
+        "note": "B2"
+      },
+      "onset_slope_db": 6.02,
+      "polyphonic_notes_near_onset": [
+        {
+          "confidence": 0.722,
+          "duration_seconds": 0.244,
+          "midi": 47,
+          "note": "B2",
+          "start_seconds": 16.705
+        },
+        {
+          "confidence": 0.439,
+          "duration_seconds": 0.72,
+          "midi": 54,
+          "note": "F#3",
+          "start_seconds": 16.694
+        },
+        {
+          "confidence": 0.512,
+          "duration_seconds": 1.3,
+          "midi": 66,
+          "note": "F#4",
+          "start_seconds": 16.694
+        },
+        {
+          "confidence": 0.465,
+          "duration_seconds": 0.615,
+          "midi": 73,
+          "note": "C#5",
+          "start_seconds": 16.682
+        }
+      ],
+      "spectrum": {
+        "added_85_percent_rolloff_hz": 556.6,
+        "added_spectral_centroid_hz": 361.1,
+        "harmonic_band_power_fraction": 0.5648,
+        "harmonics_relative_db": [
+          0.0,
+          -14.74,
+          2.42,
+          -16.66,
+          -31.64,
+          -10.13,
+          -38.26,
+          -29.38
+        ],
+        "measured_fundamental_hz": 123.047,
+        "non_harmonic_or_layer_power_fraction": 0.4352,
+        "pitch_offset_cents": -5.95
+      },
+      "stereo": {
+        "left_right_correlation": 0.8406,
+        "side_to_mid_db": -10.63
+      },
+      "time_seconds": 16.699
+    },
+    {
+      "envelope": {
+        "attack_10_to_90_ms": 47.38,
+        "energy_step_db": 14.73,
+        "peak_delay_ms": 40.83,
+        "rms_0_to_200ms_dbfs": -23.21,
+        "rms_500_to_700ms_relative_db": -4.36,
+        "rms_900_to_1100ms_relative_db": -7.33
+      },
+      "index": 4,
+      "inferred_root": {
+        "added_power_db": 27.75,
+        "alternatives": [
+          {
+            "added_power_db": 27.75,
+            "midi": 49,
+            "note": "C#3"
+          },
+          {
+            "added_power_db": 22.68,
+            "midi": 50,
+            "note": "D3"
+          },
+          {
+            "added_power_db": 22.2,
+            "midi": 48,
+            "note": "C3"
+          }
+        ],
+        "frequency_hz": 138.591,
+        "midi": 49,
+        "note": "C#3"
+      },
+      "onset_slope_db": 6.88,
+      "polyphonic_notes_near_onset": [
+        {
+          "confidence": 0.511,
+          "duration_seconds": 0.906,
+          "midi": 49,
+          "note": "C#3",
+          "start_seconds": 19.098
+        },
+        {
+          "confidence": 0.485,
+          "duration_seconds": 0.488,
+          "midi": 64,
+          "note": "E4",
+          "start_seconds": 19.11
+        }
+      ],
+      "spectrum": {
+        "added_85_percent_rolloff_hz": 334.0,
+        "added_spectral_centroid_hz": 224.9,
+        "harmonic_band_power_fraction": 0.4618,
+        "harmonics_relative_db": [
+          0.0,
+          -21.27,
+          -26.57,
+          -28.27,
+          -31.63,
+          -38.69,
+          -27.42,
+          -168.48
+        ],
+        "measured_fundamental_hz": 137.695,
+        "non_harmonic_or_layer_power_fraction": 0.5382,
+        "pitch_offset_cents": -11.23
+      },
+      "stereo": {
+        "left_right_correlation": 0.6763,
+        "side_to_mid_db": -7.03
+      },
+      "time_seconds": 19.088
+    }
+  ],
+  "interpretation": {
+    "caveat": "This is a mixed stereo excerpt, not an isolated stem. Root notes are inferred from background-subtracted CQT power and cross-checked with Basic Pitch; upper notes and non-harmonic power can include the overlapping strings and prior tails.",
+    "sound_target": "The newly exposed low-note layer is fundamental-forward and dark, with changing upper partial or chord content and a clearly audible stereo production layer.",
+    "tonal_field": "B minor / D major"
+  },
+  "phrase": {
+    "normalized_onset_intervals": [
+      1.978,
+      1.0,
+      1.974
+    ],
+    "onset_intervals_seconds": [
+      2.395,
+      1.211,
+      2.389
+    ],
+    "root_midi_sequence": [
+      50,
+      54,
+      47,
+      49
+    ],
+    "root_sequence": [
+      "D3",
+      "F#3",
+      "B2",
+      "C#3"
+    ]
+  },
+  "selection": {
+    "focus_start_seconds": 12.5,
+    "method": "Top four peaks in the 21.33 ms log-RMS rise after 12.5 s, separated by at least 0.75 s.",
+    "reason": "The opening contains overlapping synth and string material; the four strongest later energy attacks are the requested target."
+  },
+  "source": {
+    "channels": 2,
+    "duration_seconds": 20.608,
+    "path": "model/cononical.wav",
+    "sample_rate_hz": 48000,
+    "sha256": "e19a959009e8045a9be01a132b8168f971930465d60e4fc8e1820babfcf26d5a"
+  },
+  "transcription": {
+    "model": "Basic Pitch 0.4.0 ONNX",
+    "notes": [
+      {
+        "confidence": 0.477,
+        "end_seconds": 13.278,
+        "midi": 59,
+        "note": "B3",
+        "start_seconds": 12.512
+      },
+      {
+        "confidence": 0.352,
+        "end_seconds": 12.895,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 12.535
+      },
+      {
+        "confidence": 0.342,
+        "end_seconds": 12.872,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 12.616
+      },
+      {
+        "confidence": 0.498,
+        "end_seconds": 13.754,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 13.08
+      },
+      {
+        "confidence": 0.486,
+        "end_seconds": 14.125,
+        "midi": 50,
+        "note": "D3",
+        "start_seconds": 13.115
+      },
+      {
+        "confidence": 0.341,
+        "end_seconds": 13.301,
+        "midi": 54,
+        "note": "F#3",
+        "start_seconds": 13.115
+      },
+      {
+        "confidence": 0.568,
+        "end_seconds": 13.754,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 13.115
+      },
+      {
+        "confidence": 0.496,
+        "end_seconds": 14.323,
+        "midi": 59,
+        "note": "B3",
+        "start_seconds": 13.487
+      },
+      {
+        "confidence": 0.435,
+        "end_seconds": 15.334,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 13.754
+      },
+      {
+        "confidence": 0.4,
+        "end_seconds": 13.893,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 13.754
+      },
+      {
+        "confidence": 0.436,
+        "end_seconds": 14.067,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 13.893
+      },
+      {
+        "confidence": 0.378,
+        "end_seconds": 14.381,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 14.149
+      },
+      {
+        "confidence": 0.584,
+        "end_seconds": 15.497,
+        "midi": 59,
+        "note": "B3",
+        "start_seconds": 14.334
+      },
+      {
+        "confidence": 0.494,
+        "end_seconds": 14.661,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 14.381
+      },
+      {
+        "confidence": 0.361,
+        "end_seconds": 15.09,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 14.8
+      },
+      {
+        "confidence": 0.382,
+        "end_seconds": 15.462,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 15.102
+      },
+      {
+        "confidence": 0.455,
+        "end_seconds": 15.497,
+        "midi": 54,
+        "note": "F#3",
+        "start_seconds": 15.404
+      },
+      {
+        "confidence": 0.393,
+        "end_seconds": 15.996,
+        "midi": 61,
+        "note": "C#4",
+        "start_seconds": 15.473
+      },
+      {
+        "confidence": 0.582,
+        "end_seconds": 15.973,
+        "midi": 69,
+        "note": "A4",
+        "start_seconds": 15.497
+      },
+      {
+        "confidence": 0.623,
+        "end_seconds": 15.845,
+        "midi": 54,
+        "note": "F#3",
+        "start_seconds": 15.508
+      },
+      {
+        "confidence": 0.284,
+        "end_seconds": 15.74,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 15.601
+      },
+      {
+        "confidence": 0.33,
+        "end_seconds": 15.891,
+        "midi": 59,
+        "note": "B3",
+        "start_seconds": 15.775
+      },
+      {
+        "confidence": 0.624,
+        "end_seconds": 15.984,
+        "midi": 54,
+        "note": "F#3",
+        "start_seconds": 15.845
+      },
+      {
+        "confidence": 0.41,
+        "end_seconds": 16.647,
+        "midi": 59,
+        "note": "B3",
+        "start_seconds": 15.903
+      },
+      {
+        "confidence": 0.457,
+        "end_seconds": 16.356,
+        "midi": 69,
+        "note": "A4",
+        "start_seconds": 15.973
+      },
+      {
+        "confidence": 0.489,
+        "end_seconds": 16.449,
+        "midi": 54,
+        "note": "F#3",
+        "start_seconds": 15.984
+      },
+      {
+        "confidence": 0.398,
+        "end_seconds": 16.275,
+        "midi": 61,
+        "note": "C#4",
+        "start_seconds": 16.135
+      },
+      {
+        "confidence": 0.336,
+        "end_seconds": 16.682,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 16.379
+      },
+      {
+        "confidence": 0.538,
+        "end_seconds": 16.694,
+        "midi": 54,
+        "note": "F#3",
+        "start_seconds": 16.449
+      },
+      {
+        "confidence": 0.354,
+        "end_seconds": 16.671,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 16.496
+      },
+      {
+        "confidence": 0.562,
+        "end_seconds": 16.705,
+        "midi": 47,
+        "note": "B2",
+        "start_seconds": 16.578
+      },
+      {
+        "confidence": 0.465,
+        "end_seconds": 17.297,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 16.682
+      },
+      {
+        "confidence": 0.439,
+        "end_seconds": 17.414,
+        "midi": 54,
+        "note": "F#3",
+        "start_seconds": 16.694
+      },
+      {
+        "confidence": 0.512,
+        "end_seconds": 17.994,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 16.694
+      },
+      {
+        "confidence": 0.722,
+        "end_seconds": 16.949,
+        "midi": 47,
+        "note": "B2",
+        "start_seconds": 16.705
+      },
+      {
+        "confidence": 0.36,
+        "end_seconds": 17.089,
+        "midi": 59,
+        "note": "B3",
+        "start_seconds": 16.938
+      },
+      {
+        "confidence": 0.668,
+        "end_seconds": 17.17,
+        "midi": 47,
+        "note": "B2",
+        "start_seconds": 16.949
+      },
+      {
+        "confidence": 0.651,
+        "end_seconds": 17.356,
+        "midi": 47,
+        "note": "B2",
+        "start_seconds": 17.17
+      },
+      {
+        "confidence": 0.542,
+        "end_seconds": 18.506,
+        "midi": 47,
+        "note": "B2",
+        "start_seconds": 17.356
+      },
+      {
+        "confidence": 0.375,
+        "end_seconds": 17.75,
+        "midi": 73,
+        "note": "C#5",
+        "start_seconds": 17.53
+      },
+      {
+        "confidence": 0.392,
+        "end_seconds": 18.727,
+        "midi": 59,
+        "note": "B3",
+        "start_seconds": 17.797
+      },
+      {
+        "confidence": 0.531,
+        "end_seconds": 18.157,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 17.994
+      },
+      {
+        "confidence": 0.424,
+        "end_seconds": 18.518,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 18.157
+      },
+      {
+        "confidence": 0.443,
+        "end_seconds": 18.947,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 18.704
+      },
+      {
+        "confidence": 0.327,
+        "end_seconds": 18.855,
+        "midi": 47,
+        "note": "B2",
+        "start_seconds": 18.762
+      },
+      {
+        "confidence": 0.513,
+        "end_seconds": 20.539,
+        "midi": 59,
+        "note": "B3",
+        "start_seconds": 18.808
+      },
+      {
+        "confidence": 0.511,
+        "end_seconds": 20.004,
+        "midi": 49,
+        "note": "C#3",
+        "start_seconds": 19.098
+      },
+      {
+        "confidence": 0.485,
+        "end_seconds": 19.598,
+        "midi": 64,
+        "note": "E4",
+        "start_seconds": 19.11
+      },
+      {
+        "confidence": 0.345,
+        "end_seconds": 19.992,
+        "midi": 64,
+        "note": "E4",
+        "start_seconds": 19.598
+      },
+      {
+        "confidence": 0.392,
+        "end_seconds": 20.528,
+        "midi": 66,
+        "note": "F#4",
+        "start_seconds": 19.714
+      }
+    ],
+    "settings": {
+      "frame_threshold": 0.3,
+      "maximum_frequency_hz": 2500.0,
+      "minimum_frequency_hz": 55.0,
+      "minimum_note_length_ms": 80.0,
+      "onset_threshold": 0.45
+    }
+  }
+}

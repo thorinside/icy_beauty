@@ -1,0 +1,287 @@
+{
+  "aggregates": {
+    "max_attack_error_ms": 10.66,
+    "max_centroid_error_octaves": 0.7514,
+    "max_pitch_error_cents": 7.09,
+    "max_rolloff_error_octaves": 0.8282,
+    "max_second_harmonic_error_db": 9.61,
+    "max_tail_500ms_error_db": 7.04,
+    "max_tail_900ms_error_db": 3.62,
+    "median_attack_error_ms": 6.385,
+    "median_centroid_error_octaves": 0.2748,
+    "median_pitch_error_cents": 5.24,
+    "median_rolloff_error_octaves": 0.3276,
+    "median_second_harmonic_error_db": 5.45,
+    "median_tail_500ms_error_db": 4.335,
+    "median_tail_900ms_error_db": 1.635
+  },
+  "candidate": {
+    "channels": 1,
+    "duration_seconds": 8.5,
+    "path": "analysis/candidate/current-default.wav",
+    "peak": 0.354645,
+    "sample_rate_hz": 48000,
+    "sha256": "211ae9a2961e824f8132c938980e95e0e1a87861d3c09b09b610b9d20db2798f"
+  },
+  "candidate_events": [
+    {
+      "envelope": {
+        "attack_10_to_90_ms": 35.02,
+        "energy_step_db": 222.22,
+        "peak_delay_ms": 144.5,
+        "rms_0_to_200ms_dbfs": -17.78,
+        "rms_500_to_700ms_relative_db": -1.62,
+        "rms_900_to_1100ms_relative_db": -10.96
+      },
+      "index": 1,
+      "initial_rms_dbfs": -17.78,
+      "peak": 0.34021,
+      "pitch": {
+        "measured_fundamental_hz": 147.217,
+        "offset_cents": 4.53
+      },
+      "root_midi": 50,
+      "root_note": "D3",
+      "spectrum": {
+        "added_85_percent_rolloff_hz": 372.1,
+        "added_spectral_centroid_hz": 255.5,
+        "harmonic_band_power_fraction": 0.3902,
+        "harmonics_relative_db": [
+          0.0,
+          -16.82,
+          -17.1,
+          -58.29,
+          -26.99,
+          -36.36,
+          -33.5,
+          -52.86
+        ],
+        "measured_fundamental_hz": 146.484,
+        "non_harmonic_or_layer_power_fraction": 0.6098,
+        "pitch_offset_cents": -4.11
+      },
+      "time_seconds": 0.5
+    },
+    {
+      "envelope": {
+        "attack_10_to_90_ms": 36.31,
+        "energy_step_db": 42.21,
+        "peak_delay_ms": 93.75,
+        "rms_0_to_200ms_dbfs": -17.79,
+        "rms_500_to_700ms_relative_db": -1.67,
+        "rms_900_to_1100ms_relative_db": -10.96
+      },
+      "index": 2,
+      "initial_rms_dbfs": -17.79,
+      "peak": 0.334869,
+      "pitch": {
+        "measured_fundamental_hz": 185.303,
+        "offset_cents": 2.86
+      },
+      "root_midi": 54,
+      "root_note": "F#3",
+      "spectrum": {
+        "added_85_percent_rolloff_hz": 468.8,
+        "added_spectral_centroid_hz": 320.4,
+        "harmonic_band_power_fraction": 0.3936,
+        "harmonics_relative_db": [
+          0.0,
+          -16.34,
+          -17.03,
+          -55.04,
+          -27.25,
+          -36.76,
+          -34.01,
+          -53.72
+        ],
+        "measured_fundamental_hz": 184.57,
+        "non_harmonic_or_layer_power_fraction": 0.6064,
+        "pitch_offset_cents": -4.0
+      },
+      "time_seconds": 2.894667
+    },
+    {
+      "envelope": {
+        "attack_10_to_90_ms": 37.35,
+        "energy_step_db": 14.78,
+        "peak_delay_ms": 95.42,
+        "rms_0_to_200ms_dbfs": -17.68,
+        "rms_500_to_700ms_relative_db": -1.71,
+        "rms_900_to_1100ms_relative_db": -10.93
+      },
+      "index": 3,
+      "initial_rms_dbfs": -17.68,
+      "peak": 0.354645,
+      "pitch": {
+        "measured_fundamental_hz": 123.047,
+        "offset_cents": -5.95
+      },
+      "root_midi": 47,
+      "root_note": "B2",
+      "spectrum": {
+        "added_85_percent_rolloff_hz": 313.5,
+        "added_spectral_centroid_hz": 214.5,
+        "harmonic_band_power_fraction": 0.3888,
+        "harmonics_relative_db": [
+          0.0,
+          -16.16,
+          -18.62,
+          -173.8,
+          -27.03,
+          -35.99,
+          -33.27,
+          -54.29
+        ],
+        "measured_fundamental_hz": 123.047,
+        "non_harmonic_or_layer_power_fraction": 0.6112,
+        "pitch_offset_cents": -5.95
+      },
+      "time_seconds": 4.105333
+    },
+    {
+      "envelope": {
+        "attack_10_to_90_ms": 36.94,
+        "energy_step_db": 42.07,
+        "peak_delay_ms": 109.73,
+        "rms_0_to_200ms_dbfs": -17.72,
+        "rms_500_to_700ms_relative_db": -1.67,
+        "rms_900_to_1100ms_relative_db": -10.95
+      },
+      "index": 4,
+      "initial_rms_dbfs": -17.72,
+      "peak": 0.340698,
+      "pitch": {
+        "measured_fundamental_hz": 139.16,
+        "offset_cents": 7.09
+      },
+      "root_midi": 49,
+      "root_note": "C#3",
+      "spectrum": {
+        "added_85_percent_rolloff_hz": 351.6,
+        "added_spectral_centroid_hz": 241.9,
+        "harmonic_band_power_fraction": 0.4373,
+        "harmonics_relative_db": [
+          0.0,
+          -16.8,
+          -17.91,
+          -55.46,
+          -27.46,
+          -36.91,
+          -33.73,
+          -55.71
+        ],
+        "measured_fundamental_hz": 137.695,
+        "non_harmonic_or_layer_power_fraction": 0.5627,
+        "pitch_offset_cents": -11.23
+      },
+      "time_seconds": 6.494667
+    }
+  ],
+  "comparison_version": 1,
+  "event_errors": [
+    {
+      "attack_error_ms": 2.33,
+      "centroid_error_octaves": 0.4379,
+      "pitch_error_cents": 4.53,
+      "rolloff_error_octaves": 0.581,
+      "second_harmonic_error_db": 6.43,
+      "tail_500ms_error_db": 7.04,
+      "tail_900ms_error_db": 1.32
+    },
+    {
+      "attack_error_ms": 10.66,
+      "centroid_error_octaves": 0.1117,
+      "pitch_error_cents": 2.86,
+      "rolloff_error_octaves": 0.0648,
+      "second_harmonic_error_db": 9.61,
+      "tail_500ms_error_db": 1.93,
+      "tail_900ms_error_db": 1.95
+    },
+    {
+      "attack_error_ms": 0.69,
+      "centroid_error_octaves": 0.7514,
+      "pitch_error_cents": 5.95,
+      "rolloff_error_octaves": 0.8282,
+      "second_harmonic_error_db": 1.42,
+      "tail_500ms_error_db": 5.98,
+      "tail_900ms_error_db": 0.97
+    },
+    {
+      "attack_error_ms": 10.44,
+      "centroid_error_octaves": 0.1051,
+      "pitch_error_cents": 7.09,
+      "rolloff_error_octaves": 0.0741,
+      "second_harmonic_error_db": 4.47,
+      "tail_500ms_error_db": 2.69,
+      "tail_900ms_error_db": 3.62
+    }
+  ],
+  "gates": {
+    "attack": {
+      "limit": "median error <= 15 ms",
+      "passed": true,
+      "value": 6.385
+    },
+    "headroom": {
+      "limit": "peak < 0.98",
+      "passed": true,
+      "value": 0.354645
+    },
+    "pitch": {
+      "limit": "max <= 15 cents",
+      "passed": true,
+      "value": 7.09
+    },
+    "release_500ms": {
+      "limit": "median error <= 6 dB",
+      "passed": true,
+      "value": 4.335
+    },
+    "release_900ms": {
+      "limit": "median error <= 8 dB",
+      "passed": true,
+      "value": 1.635
+    },
+    "second_harmonic": {
+      "limit": "median error <= 8 dB",
+      "passed": true,
+      "value": 5.45
+    },
+    "spectral_centroid": {
+      "limit": "median error <= 0.35 octaves",
+      "passed": true,
+      "value": 0.2748
+    },
+    "spectral_rolloff": {
+      "limit": "median error <= 0.50 octaves",
+      "passed": true,
+      "value": 0.3276
+    }
+  },
+  "passed": true,
+  "phrase": {
+    "event_times_seconds": [
+      0.5,
+      2.894667,
+      4.105333,
+      6.494667
+    ],
+    "gate_duration_seconds": 0.5,
+    "onset_intervals_seconds": [
+      2.394667,
+      1.210667,
+      2.389333
+    ],
+    "root_sequence": [
+      "D3",
+      "F#3",
+      "B2",
+      "C#3"
+    ]
+  },
+  "reference": {
+    "analysis_path": "analysis/reference/strong-note-analysis.json",
+    "source_sha256": "e19a959009e8045a9be01a132b8168f971930465d60e4fc8e1820babfcf26d5a"
+  },
+  "scope": "Objective dry-mono model gate for pitch, attack, dark spectral balance, second harmonic, release, and headroom. It does not replace owner listening acceptance and deliberately excludes the reference recording's stereo/string production residue."
+}

@@ -539,7 +539,7 @@ int runDenseMidiEndurance(const _NT_factory* factory) {
     for (uint8_t index = 0; index < kMaxVoices; ++index)
         factory->midiMessage(endurance.algorithm, 0x80, notes[index], 0);
 
-    const uint32_t releaseBlocks = 2U * sampleRate / frames;
+    const uint32_t releaseBlocks = 6U * sampleRate / frames;
     for (uint32_t block = 0; block < releaseBlocks; ++block) {
         factory->step(endurance.algorithm, busses.data(), frames / 4);
         const float* output = busses.data() + 12 * frames;
@@ -1106,10 +1106,11 @@ int main(int argc, char** argv) {
 
     factory->midiMessage(midi.algorithm, 0x89, 69, 0);
     float releasePeak = 0.0f;
-    for (int block = 0; block < 800; ++block) {
+    const int defaultReleaseBlocks = 4200;
+    for (int block = 0; block < defaultReleaseBlocks; ++block) {
         std::fill(busses.begin(), busses.end(), 0.0f);
         factory->step(midi.algorithm, busses.data(), frames / 4);
-        if (block == 799) {
+        if (block + 1 == defaultReleaseBlocks) {
             const float* releasedOutput = busses.data() + 12 * frames;
             for (int frame = 0; frame < frames; ++frame) {
                 releasePeak = std::max(releasePeak,
@@ -1186,6 +1187,8 @@ int main(int argc, char** argv) {
     }
     if (eightVoicePeak < 0.1f)
         return fail("eight occupied MIDI voices did not render audible output");
+    if (eightVoicePeak >= 0.98f)
+        return fail("eight occupied MIDI voices exceeded dry-output headroom");
 
     HostInstance sustainedReplacement(factory, 8);
     for (uint8_t note = 60; note < 68; ++note)

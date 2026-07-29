@@ -1,6 +1,6 @@
 # Icy Beauty
 
-Icy Beauty is a focused software synthesizer plug-in for the Expert Sleepers disting NT. It exposes one curated, fixed signal path built from paired triangle oscillators, animated tuning, noise instability, tone shaping, and a tuned resonator. It listens in MIDI Omni mode and routes audio to Output 1 by default. The **Voices** specification configures one to eight shared voices (four by default) for both MIDI and polyphonic CV/gate playing.
+Icy Beauty is a focused software synthesizer plug-in for the Expert Sleepers disting NT. It exposes one curated, fixed signal path built from a fundamental-forward triangle voice, restrained octave color, an intervallic upper shimmer, animated tuning, noise instability, tone shaping, and a tuned resonator. It listens in MIDI Omni mode and routes audio to Output 1 by default. The **Voices** specification configures one to eight shared voices (four by default) for both MIDI and polyphonic CV/gate playing.
 
 The deliberately small sound surface contains exactly five host-mappable controls: **Tone** moves from dark toward glassy harmonics, **Motion** adds animated instability, **Grain** introduces noisy pitch texture, **Resonance** strengthens tuned ringing, and **Release** ranges from short decays to haunting tails. A fresh load centers Tone, Motion, Grain, and Resonance at 50% and sets Release to a medium-long 65%, yielding an immediately playable icy patch without setup. These are ordinary host parameters with no dedicated algorithm-level CV inputs; musicians can assign CV through the disting NT host's parameter-to-CV mapping. There are no selectable synthesis engines or general-purpose routing matrix.
 
@@ -35,7 +35,7 @@ make verify
 
 The installable module product is `plugins/icy_beauty.o`. Copy that relocatable object to the disting NT plug-ins folder using the module's supported SD-card workflow.
 
-`make verify` rebuilds the ARM Cortex-M7 object, runs a native host-contract/render test, round-trips a non-default six-voice preset through the host-managed specification and parameter contract, verifies that the untouched fresh-load patch produces finite animated audio and a medium-long tail through Output 1 from Omni MIDI, characterizes the five controls at their extremes (brightness, pitch animation, noise roughness, tuned resonance, and release-tail duration), verifies fixed velocity, sustain, pitch-bend, modulation-wheel, polyphonic-aftertouch, and channel-pressure behavior, and inspects the object architecture and `pluginEntry` export.
+`make verify` rebuilds the ARM Cortex-M7 object, runs a native host-contract/render test, round-trips a non-default six-voice preset through the host-managed specification and parameter contract, verifies that the untouched fresh-load patch produces finite animated audio and a medium-long tail through Output 1 from Omni MIDI, characterizes the five controls at their extremes (brightness, pitch animation, noise roughness, tuned resonance, and release-tail duration), verifies fixed velocity, sustain, pitch-bend, modulation-wheel, polyphonic-aftertouch, and channel-pressure behavior, checks retained reference-model evidence, and inspects the object architecture and `pluginEntry` export.
 
 `make endurance` additionally simulates 30 minutes of continuous eight-voice dense MIDI. It cycles eight-note note-on/note-off activity, voice replacement, sustain, velocity, pitch bend, modulation wheel, channel pressure, and polyphonic pressure while checking every rendered sample, one-second audio continuity, and final voice release. This accelerated native check is a regression test, not a substitute for the retained 30-minute run on a physical disting NT. See [`TARGET_VALIDATION.md`](TARGET_VALIDATION.md) for the target procedures and retained physical evidence.
 
@@ -52,9 +52,35 @@ only so macOS can attribute the NT USB input request to a declared application
 identity. `make hardware-latency-smoke` exercises the same routing, capture,
 analysis, and rollback with one note-on and never submits acceptance evidence.
 
-## Canonical reference
+## Canonical reference and sonic model
 
-The owner-supplied comparison excerpt is retained locally at `model/cononical.wav`, as required by the approved Spec. It is development reference material only: the build does not read, embed, copy, or package it.
+The owner-supplied comparison excerpt is retained locally at
+`model/cononical.wav`, as required by the approved Spec. The opening contains
+overlaid synth and string material, so development targets the four exposed
+energy attacks after 12.5 seconds. Reproducible waveform, polyphonic-note,
+envelope, harmonic, and stereo analysis identifies the low phrase as
+**D3 → F#3 → B2 → C#3**, with onset intervals of approximately
+**2.395 → 1.211 → 2.389 seconds**. The inferred upper notes are retained with
+confidence values and an explicit mixed-source caveat.
+
+Run the complete dry-mono model check with:
+
+```sh
+make sonic-model
+```
+
+That command verifies the source WAV hash, regenerates
+`analysis/reference/strong-note-analysis.json`, renders the exact plug-in DSP
+playing the inferred phrase, and checks pitch, attack, spectral balance,
+second-harmonic level, release shape, and output headroom. The retained
+`analysis/candidate/pre-model-baseline.wav` records the former implementation;
+`analysis/candidate/current-default.wav` is the modelled fresh-load sound for
+auditioning. The comparison is an objective development gate, not a substitute
+for owner listening acceptance.
+
+The reference remains development material only. The ARM plug-in build does
+not read, embed, copy, or package the WAV, analysis dependencies, or derived
+reports.
 
 ## Dependency and licensing
 

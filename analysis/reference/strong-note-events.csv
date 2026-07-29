@@ -1,0 +1,5 @@
+event,time_seconds,root_midi,root_note,onset_slope_db,energy_step_db,attack_ms,centroid_hz,rolloff_hz,side_to_mid_db,polyphonic_notes
+1,13.093,50,D3,6.99,12.71,37.35,346.1,556.6,-8.7,D3 F#3 F#4 C#5
+2,15.488,54,F#3,5.46,9.99,25.65,346.2,448.2,-8.95,F#3 C#4 A4
+3,16.699,47,B2,6.02,10.25,38.04,361.1,556.6,-10.63,B2 F#3 F#4 C#5
+4,19.088,49,C#3,6.88,14.73,47.38,224.9,334.0,-7.03,C#3 E4
