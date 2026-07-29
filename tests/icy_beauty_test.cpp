@@ -72,6 +72,44 @@ struct HostInstance {
     std::vector<int16_t> values;
 };
 
+struct HostPreset {
+    uint32_t factoryGuid;
+    std::vector<int32_t> specifications;
+    std::vector<int16_t> parameters;
+};
+
+HostPreset saveHostPreset(const HostInstance& host) {
+    HostPreset preset;
+    preset.factoryGuid = host.factory->guid;
+    preset.specifications.assign(
+        host.specification,
+        host.specification + host.factory->numSpecifications);
+    preset.parameters = host.values;
+    return preset;
+}
+
+bool loadHostPreset(HostInstance& host, const HostPreset& preset) {
+    if (preset.factoryGuid != host.factory->guid ||
+        preset.specifications.size() != host.factory->numSpecifications ||
+        preset.parameters.size() != host.values.size())
+        return false;
+    for (uint32_t specification = 0;
+         specification < host.factory->numSpecifications; ++specification) {
+        if (preset.specifications[specification] !=
+            host.specification[specification])
+            return false;
+    }
+
+    std::copy(preset.parameters.begin(), preset.parameters.end(),
+              host.values.begin());
+    if (host.factory->parameterChanged != NULL) {
+        for (uint32_t parameter = 0;
+             parameter < host.requirements.numParameters; ++parameter)
+            host.factory->parameterChanged(host.algorithm, parameter);
+    }
+    return true;
+}
+
 void setCvInputs(std::vector<float>& busses, int frames, int voices,
                  float gateVoltage, const float* pitches) {
     std::fill(busses.begin(), busses.end(), 0.0f);
@@ -612,6 +650,66 @@ int main(int argc, char** argv) {
     std::puts(
         "PASS: voice counts 1..8 expose only Gate plus sequential Pitch CV "
         "inputs; sound controls remain host-mappable parameters");
+
+    {
+        const int32_t savedVoiceCount = 6;
+        HostInstance presetSource(factory, savedVoiceCount);
+        presetSource.values[kParamOutput] = 21;
+        presetSource.values[kParamOutputMode] = 1;
+        presetSource.values[kParamMidiChannel] = 11;
+        presetSource.values[kParamGate] = 4;
+        for (int voice = 0; voice < savedVoiceCount; ++voice)
+            presetSource.values[kParamPitchFirst + voice] = 8 + voice;
+        static const int16_t kSavedSoundValues[kNumSoundParameters] = {
+            17, 29, 43, 71, 88,
+        };
+        for (int control = 0; control < kNumSoundParameters; ++control) {
+            presetSource.values[presetSource.synth()->soundParameter(
+                static_cast<SoundParameter>(control))] =
+                kSavedSoundValues[control];
+        }
+        for (uint32_t parameter = 0;
+             parameter < presetSource.requirements.numParameters;
+             ++parameter) {
+            if (presetSource.values[parameter] ==
+                presetSource.algorithm->parameters[parameter].def)
+                return fail("preset test did not change every exposed setting");
+        }
+
+        const HostPreset preset = saveHostPreset(presetSource);
+        for (uint32_t parameter = 0;
+             parameter < presetSource.requirements.numParameters;
+             ++parameter) {
+            presetSource.values[parameter] =
+                presetSource.algorithm->parameters[parameter].def;
+        }
+
+        HostInstance restored(factory, preset.specifications[0]);
+        if (!loadHostPreset(restored, preset))
+            return fail("host preset could not reconstruct and restore the synth");
+        if (restored.synth()->voiceCount != savedVoiceCount ||
+            restored.values[kParamOutput] != 21 ||
+            restored.values[kParamOutputMode] != 1 ||
+            restored.values[kParamMidiChannel] != 11 ||
+            restored.values[kParamGate] != 4)
+            return fail("preset did not restore voice count, MIDI, gate, or routing");
+        for (int voice = 0; voice < savedVoiceCount; ++voice) {
+            if (restored.values[kParamPitchFirst + voice] != 8 + voice)
+                return fail("preset did not restore a sequential pitch input");
+        }
+        for (int control = 0; control < kNumSoundParameters; ++control) {
+            if (restored.values[restored.synth()->soundParameter(
+                    static_cast<SoundParameter>(control))] !=
+                kSavedSoundValues[control])
+                return fail("preset did not restore a sound control");
+        }
+        if (restored.values != preset.parameters)
+            return fail("preset did not restore every exposed setting");
+
+        std::puts(
+            "PASS: host preset round trip restores voice count, five sound "
+            "controls, MIDI, routing, CV assignments, and every exposed setting");
+    }
 
     HostInstance midi(factory, 4);
     if (midi.algorithm == NULL || midi.algorithm->parameters == NULL ||

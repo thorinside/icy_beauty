@@ -8,6 +8,8 @@ CV/gate control exposes one shared **Gate** input followed by one **Pitch** CV i
 
 MIDI velocity controls loudness with a subtler brightness lift. Sustain behaves like a conventional piano pedal, pitch bend has a fixed ±2-semitone range, and the modulation wheel increases Motion. Aftertouch raises Resonance and adds a smaller amount of Motion: polyphonic pressure remains independent per note, while channel pressure applies across the chord. These mappings are fixed and channel-aware, including when the synth listens in Omni mode; they do not add a user-configurable mapping surface.
 
+Presets use the disting NT host's standard mechanism. **Voices** is restored as the factory specification so the host reconstructs the matching dynamic parameter surface; the five sound controls, MIDI channel, output routing, Gate and Pitch assignments, and every other exposed setting are ordinary system-managed parameter values. The plug-in has no additional private setting that requires custom preset JSON.
+
 This remains an incremental delivery. Target-hardware performance and owner listening acceptance are future work.
 
 ## Build
@@ -27,7 +29,7 @@ make verify
 
 The installable module product is `plugins/icy_beauty.o`. Copy that relocatable object to the disting NT plug-ins folder using the module's supported SD-card workflow.
 
-`make verify` rebuilds the ARM Cortex-M7 object, runs a native host-contract/render test, verifies that the untouched fresh-load patch produces finite animated audio and a medium-long tail through Output 1 from Omni MIDI, characterizes the five controls at their extremes (brightness, pitch animation, noise roughness, tuned resonance, and release-tail duration), verifies fixed velocity, sustain, pitch-bend, modulation-wheel, polyphonic-aftertouch, and channel-pressure behavior, and inspects the object architecture and `pluginEntry` export.
+`make verify` rebuilds the ARM Cortex-M7 object, runs a native host-contract/render test, round-trips a non-default six-voice preset through the host-managed specification and parameter contract, verifies that the untouched fresh-load patch produces finite animated audio and a medium-long tail through Output 1 from Omni MIDI, characterizes the five controls at their extremes (brightness, pitch animation, noise roughness, tuned resonance, and release-tail duration), verifies fixed velocity, sustain, pitch-bend, modulation-wheel, polyphonic-aftertouch, and channel-pressure behavior, and inspects the object architecture and `pluginEntry` export.
 
 `make endurance` additionally simulates 30 minutes of continuous eight-voice dense MIDI. It cycles eight-note note-on/note-off activity, voice replacement, sustain, velocity, pitch bend, modulation wheel, channel pressure, and polyphonic pressure while checking every rendered sample, one-second audio continuity, and final voice release. This accelerated native check is a regression test, not a substitute for the required 30-minute run on a physical disting NT. See [`TARGET_VALIDATION.md`](TARGET_VALIDATION.md) for the target procedure and remaining acceptance evidence.
 
