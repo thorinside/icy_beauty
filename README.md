@@ -1,8 +1,10 @@
 # Icy Beauty
 
-Icy Beauty is a focused software synthesizer plug-in for the Expert Sleepers disting NT. The current vertical slice is a playable MIDI instrument: it exposes a disting NT API factory, listens in MIDI Omni mode, renders an icy dual-triangle voice, and routes audio to Output 1 by default.
+Icy Beauty is a focused software synthesizer plug-in for the Expert Sleepers disting NT. It exposes a disting NT API factory, listens in MIDI Omni mode, renders an icy dual-triangle voice, and routes audio to Output 1 by default. The **Voices** specification configures one to eight shared voices (four by default) for both MIDI and polyphonic CV/gate playing.
 
-This is an early delivery slice, not the complete approved instrument. Polyphony, CV/gate control, the five final sound controls, expressive MIDI mappings, and target-hardware performance/listening acceptance remain future work.
+CV/gate control exposes one shared **Gate** input followed by one **Pitch** CV input per configured voice. The defaults follow the disting NT sequential-input convention: Gate uses Input 1, and Pitch 1 onward use Input 2 onward. A rising gate triggers the configured pitches together; a falling gate releases them. When MIDI and CV contend for the shared voice pool, held MIDI notes take priority: MIDI may replace a CV voice, while a CV gate retrigger preserves held MIDI notes.
+
+This is an early delivery slice, not the complete approved instrument. The five final sound controls, expressive MIDI mappings, and target-hardware performance/listening acceptance remain future work.
 
 ## Build
 

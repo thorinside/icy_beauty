@@ -17,6 +17,8 @@ const _NT_globals NT_globals = {
     0,
 };
 
+#include "../icy_beauty.cpp"
+
 namespace {
 
 int fail(const char* message) {
@@ -28,6 +30,74 @@ std::vector<std::max_align_t> allocateAligned(std::size_t byteCount) {
     const std::size_t count =
         (byteCount + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t);
     return std::vector<std::max_align_t>(count == 0 ? 1 : count);
+}
+
+struct HostInstance {
+    HostInstance(const _NT_factory* instanceFactory, int32_t voices)
+        : factory(instanceFactory), requirements(), algorithm(NULL) {
+        specification[0] = voices;
+        factory->calculateRequirements(requirements, specification);
+        sram = allocateAligned(requirements.sram);
+        dtc = allocateAligned(requirements.dtc);
+        _NT_algorithmMemoryPtrs memory = {
+            reinterpret_cast<uint8_t*>(sram.data()),
+            NULL,
+            reinterpret_cast<uint8_t*>(dtc.data()),
+            NULL,
+        };
+        algorithm = factory->construct(memory, requirements, specification);
+        values.resize(requirements.numParameters);
+        for (uint32_t parameter = 0;
+             parameter < requirements.numParameters; ++parameter) {
+            values[parameter] = algorithm->parameters[parameter].def;
+        }
+        algorithm->v = values.data();
+        algorithm->vIncludingCommon = values.data();
+    }
+
+    HostInstance(const HostInstance&) = delete;
+    HostInstance& operator=(const HostInstance&) = delete;
+
+    IcyBeautyAlgorithm* synth() {
+        return static_cast<IcyBeautyAlgorithm*>(algorithm);
+    }
+
+    const _NT_factory* factory;
+    int32_t specification[1];
+    _NT_algorithmRequirements requirements;
+    std::vector<std::max_align_t> sram;
+    std::vector<std::max_align_t> dtc;
+    _NT_algorithm* algorithm;
+    std::vector<int16_t> values;
+};
+
+void setCvInputs(std::vector<float>& busses, int frames, int voices,
+                 float gateVoltage, const float* pitches) {
+    std::fill(busses.begin(), busses.end(), 0.0f);
+    std::fill(busses.begin(), busses.begin() + frames, gateVoltage);
+    for (int voice = 0; voice < voices; ++voice) {
+        float* pitchBus = busses.data() + (voice + 1) * frames;
+        std::fill(pitchBus, pitchBus + frames, pitches[voice]);
+    }
+}
+
+bool hasHeldMidiNote(const IcyBeautyAlgorithm* algorithm, uint8_t note) {
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        const Voice& voice = algorithm->dtc->voices[index];
+        if (voice.source == kVoiceMidi && voice.gate && voice.note == note)
+            return true;
+    }
+    return false;
+}
+
+int heldMidiVoiceCount(const IcyBeautyAlgorithm* algorithm) {
+    int count = 0;
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        const Voice& voice = algorithm->dtc->voices[index];
+        if (voice.source == kVoiceMidi && voice.gate)
+            ++count;
+    }
+    return count;
 }
 
 }  // namespace
@@ -49,52 +119,59 @@ int main() {
     if (factory->calculateRequirements == NULL || factory->construct == NULL ||
         factory->step == NULL || factory->midiMessage == NULL)
         return fail("plugin is missing a required synth callback");
+    if (factory->numSpecifications != 1 ||
+        std::strcmp(factory->specifications[0].name, "Voices") != 0 ||
+        factory->specifications[0].min != 1 ||
+        factory->specifications[0].max != 8 ||
+        factory->specifications[0].def != 4)
+        return fail("voice-count specification does not expose voices 1 through 8");
 
-    _NT_algorithmRequirements requirements = {};
-    factory->calculateRequirements(requirements, NULL);
-    if (requirements.numParameters != 3 || requirements.sram == 0 ||
-        requirements.dtc == 0)
-        return fail("plugin reports invalid instance requirements");
+    int32_t oneVoiceSpec[] = {1};
+    int32_t eightVoiceSpec[] = {8};
+    _NT_algorithmRequirements oneVoiceRequirements = {};
+    _NT_algorithmRequirements eightVoiceRequirements = {};
+    factory->calculateRequirements(oneVoiceRequirements, oneVoiceSpec);
+    factory->calculateRequirements(eightVoiceRequirements, eightVoiceSpec);
+    if (oneVoiceRequirements.numParameters != 5 ||
+        eightVoiceRequirements.numParameters != 12 ||
+        eightVoiceRequirements.sram == 0 || eightVoiceRequirements.dtc == 0)
+        return fail("voice count does not determine the CV pitch parameter count");
 
-    std::vector<std::max_align_t> sram = allocateAligned(requirements.sram);
-    std::vector<std::max_align_t> dtc = allocateAligned(requirements.dtc);
-    _NT_algorithmMemoryPtrs memory = {
-        reinterpret_cast<uint8_t*>(sram.data()),
-        NULL,
-        reinterpret_cast<uint8_t*>(dtc.data()),
-        NULL,
-    };
-    _NT_algorithm* algorithm =
-        factory->construct(memory, requirements, NULL);
-    if (algorithm == NULL || algorithm->parameters == NULL ||
-        algorithm->parameterPages == NULL)
+    HostInstance midi(factory, 4);
+    if (midi.algorithm == NULL || midi.algorithm->parameters == NULL ||
+        midi.algorithm->parameterPages == NULL)
         return fail("plugin instance did not expose its host parameter surface");
-
-    std::vector<int16_t> values(requirements.numParameters);
-    for (uint32_t parameter = 0; parameter < requirements.numParameters;
-         ++parameter) {
-        values[parameter] = algorithm->parameters[parameter].def;
-    }
-    algorithm->v = values.data();
-    algorithm->vIncludingCommon = values.data();
-
-    if (values[0] != 13)
+    if (midi.values[kParamOutput] != 13)
         return fail("fresh-load audio is not routed to Output 1");
-    if (values[2] != 0)
+    if (midi.values[kParamMidiChannel] != 0)
         return fail("fresh-load MIDI selection is not Omni");
+    if (std::strcmp(midi.algorithm->parameters[kParamGate].name, "Gate") != 0 ||
+        midi.algorithm->parameters[kParamGate].unit != kNT_unitCvInput ||
+        midi.values[kParamGate] != 1)
+        return fail("CV Gate is not exposed on Input 1 by default");
+    for (int voice = 0; voice < 4; ++voice) {
+        const int parameter = kParamPitchFirst + voice;
+        if (std::strcmp(midi.algorithm->parameters[parameter].name,
+                        kPitchNames[voice]) != 0 ||
+            midi.algorithm->parameters[parameter].unit != kNT_unitCvInput ||
+            midi.values[parameter] != voice + 2)
+            return fail("pitch CV inputs are not presented sequentially");
+    }
+    if (midi.algorithm->parameterPages->pages[1].numParams != 5)
+        return fail("CV/Gate page does not follow the configured voice count");
 
     const int frames = 64;
     std::vector<float> busses(kNT_lastBus * frames, 0.0f);
-    factory->midiMessage(algorithm, 0x99, 69, 112);
+    factory->midiMessage(midi.algorithm, 0x99, 69, 112);
 
     float soundingPeak = 0.0f;
     for (int block = 0; block < 32; ++block) {
         std::fill(busses.begin(), busses.end(), 0.0f);
-        factory->step(algorithm, busses.data(), frames / 4);
+        factory->step(midi.algorithm, busses.data(), frames / 4);
         const float* output1 = busses.data() + 12 * frames;
         for (int frame = 0; frame < frames; ++frame) {
             if (!std::isfinite(output1[frame]))
-                return fail("note-on rendering produced a non-finite sample");
+                return fail("MIDI note-on rendering produced a non-finite sample");
             soundingPeak = std::max(soundingPeak, std::fabs(output1[frame]));
         }
     }
@@ -103,30 +180,109 @@ int main() {
 
     float* output1 = busses.data() + 12 * frames;
     std::fill(output1, output1 + frames, 20.0f);
-    factory->step(algorithm, busses.data(), frames / 4);
+    factory->step(midi.algorithm, busses.data(), frames / 4);
     if (*std::min_element(output1, output1 + frames) < 15.0f)
         return fail("add output mode did not preserve existing bus audio");
 
-    values[1] = 1;
+    midi.values[kParamOutputMode] = 1;
     std::fill(output1, output1 + frames, 20.0f);
-    factory->step(algorithm, busses.data(), frames / 4);
+    factory->step(midi.algorithm, busses.data(), frames / 4);
     if (*std::max_element(output1, output1 + frames) > 5.0f)
         return fail("replace output mode did not replace existing bus audio");
 
-    factory->midiMessage(algorithm, 0x89, 69, 0);
+    factory->midiMessage(midi.algorithm, 0x89, 69, 0);
     float releasePeak = 0.0f;
     for (int block = 0; block < 800; ++block) {
         std::fill(busses.begin(), busses.end(), 0.0f);
-        factory->step(algorithm, busses.data(), frames / 4);
+        factory->step(midi.algorithm, busses.data(), frames / 4);
         if (block == 799) {
-            const float* output1 = busses.data() + 12 * frames;
-            for (int frame = 0; frame < frames; ++frame)
-                releasePeak = std::max(releasePeak, std::fabs(output1[frame]));
+            const float* releasedOutput = busses.data() + 12 * frames;
+            for (int frame = 0; frame < frames; ++frame) {
+                releasePeak = std::max(releasePeak,
+                                       std::fabs(releasedOutput[frame]));
+            }
         }
     }
     if (releasePeak > 0.01f)
         return fail("MIDI note-off did not release the synth voice");
 
-    std::puts("PASS: Icy Beauty exports a disting NT instrument and renders MIDI audio");
+    HostInstance cv(factory, 3);
+    const float pitches[3] = {0.0f, 0.5f, 1.0f};
+    float cvPeak = 0.0f;
+    for (int block = 0; block < 32; ++block) {
+        setCvInputs(busses, frames, 3, 5.0f, pitches);
+        factory->step(cv.algorithm, busses.data(), frames / 4);
+        const float* cvOutput = busses.data() + 12 * frames;
+        for (int frame = 0; frame < frames; ++frame) {
+            if (!std::isfinite(cvOutput[frame]))
+                return fail("CV/gate rendering produced a non-finite sample");
+            cvPeak = std::max(cvPeak, std::fabs(cvOutput[frame]));
+        }
+    }
+    if (cvPeak < 0.1f)
+        return fail("CV Gate did not render audible polyphonic synth output");
+    for (int voice = 0; voice < 3; ++voice) {
+        const Voice& state = cv.synth()->dtc->voices[voice];
+        if (state.source != kVoiceCv || !state.gate ||
+            state.phaseIncrement != phaseIncrementForPitchCv(pitches[voice]))
+            return fail("a sequential pitch CV input did not control its active voice");
+    }
+
+    setCvInputs(busses, frames, 3, 0.0f, pitches);
+    factory->step(cv.algorithm, busses.data(), frames / 4);
+    for (int voice = 0; voice < 3; ++voice) {
+        if (cv.synth()->dtc->voices[voice].gate)
+            return fail("CV Gate low did not release every CV voice");
+    }
+
+    HostInstance priority(factory, 2);
+    const float priorityPitches[2] = {0.0f, 0.25f};
+    setCvInputs(busses, frames, 2, 5.0f, priorityPitches);
+    factory->step(priority.algorithm, busses.data(), frames / 4);
+    factory->midiMessage(priority.algorithm, 0x90, 69, 100);
+    setCvInputs(busses, frames, 2, 0.0f, priorityPitches);
+    factory->step(priority.algorithm, busses.data(), frames / 4);
+    setCvInputs(busses, frames, 2, 5.0f, priorityPitches);
+    factory->step(priority.algorithm, busses.data(), frames / 4);
+    if (!hasHeldMidiNote(priority.synth(), 69))
+        return fail("a CV Gate retrigger displaced a held MIDI note");
+
+    HostInstance replacement(factory, 8);
+    for (uint8_t note = 60; note < 68; ++note)
+        factory->midiMessage(replacement.algorithm, 0x90, note, 100);
+    factory->midiMessage(replacement.algorithm, 0x80, 67, 0);
+    factory->midiMessage(replacement.algorithm, 0x90, 80, 100);
+    if (heldMidiVoiceCount(replacement.synth()) != 8 ||
+        !hasHeldMidiNote(replacement.synth(), 60) ||
+        hasHeldMidiNote(replacement.synth(), 67) ||
+        !hasHeldMidiNote(replacement.synth(), 80))
+        return fail("MIDI replacement did not choose the released voice first");
+
+    float eightVoicePeak = 0.0f;
+    for (int block = 0; block < 32; ++block) {
+        std::fill(busses.begin(), busses.end(), 0.0f);
+        factory->step(replacement.algorithm, busses.data(), frames / 4);
+        const float* eightVoiceOutput = busses.data() + 12 * frames;
+        for (int frame = 0; frame < frames; ++frame) {
+            if (!std::isfinite(eightVoiceOutput[frame]))
+                return fail("eight-voice MIDI rendering produced a non-finite sample");
+            eightVoicePeak = std::max(eightVoicePeak,
+                                      std::fabs(eightVoiceOutput[frame]));
+        }
+    }
+    if (eightVoicePeak < 0.1f)
+        return fail("eight occupied MIDI voices did not render audible output");
+
+    HostInstance heldReplacement(factory, 8);
+    for (uint8_t note = 60; note < 68; ++note)
+        factory->midiMessage(heldReplacement.algorithm, 0x90, note, 100);
+    factory->midiMessage(heldReplacement.algorithm, 0x90, 80, 100);
+    if (heldMidiVoiceCount(heldReplacement.synth()) != 8 ||
+        hasHeldMidiNote(heldReplacement.synth(), 60) ||
+        !hasHeldMidiNote(heldReplacement.synth(), 61) ||
+        !hasHeldMidiNote(heldReplacement.synth(), 80))
+        return fail("MIDI replacement did not choose the oldest held voice");
+
+    std::puts("PASS: Icy Beauty renders MIDI and voice-count-driven poly CV/gate audio");
     return 0;
 }

@@ -28,7 +28,7 @@ $(PLUGIN): $(SOURCE) $(API_DIR)/include/distingnt/api.h
 $(NATIVE_TEST): $(SOURCE) tests/icy_beauty_test.cpp $(API_DIR)/include/distingnt/api.h
 	@mkdir -p $(@D)
 	$(NATIVE_CXX) $(NATIVE_FLAGS) $(INCLUDE_FLAGS) -o $@ \
-		$(SOURCE) tests/icy_beauty_test.cpp
+		tests/icy_beauty_test.cpp
 
 test: $(NATIVE_TEST)
 	./$(NATIVE_TEST)
