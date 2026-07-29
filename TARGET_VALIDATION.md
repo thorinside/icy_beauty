@@ -11,13 +11,39 @@ Run this procedure after the approved synthesis surface and MIDI behavior are co
 3. Confirm the plug-in loads normally using only the memory made available by the host/API.
 4. Select **Voices: 8**, route to Output 1, and select MIDI Omni.
 5. Set the five sound controls to the valid combination that produces the highest processing load. Keep every approved synthesis feature enabled at its normal quality.
-6. Connect a MIDI source and audio monitoring/capture setup that can reveal dropouts, invalid output, and notes that continue after the stream stops.
+6. Connect the disting NT over USB MIDI and launch `nt_helper` with its MCP
+   server available at `http://127.0.0.1:3847/mcp`.
 
 ## Thirty-minute stream
 
 For 30 uninterrupted wall-clock minutes, repeatedly send eight-note note-on/note-off groups while varying velocity and forcing voice replacement. During the same stream, repeatedly operate sustain, full-range pitch bend, modulation wheel, polyphonic aftertouch when supported, and channel pressure. Keep the synth active rather than leaving a static chord sounding.
 
-Observe loading, host/API memory behavior, audio, and note state for the entire run. Do not lower voice count, disable a sound feature, or reduce synthesis quality to obtain a pass.
+Observe loading, host/API memory behavior, and target responsiveness for the
+entire run. Do not lower voice count, disable a sound feature, or reduce
+synthesis quality to obtain a pass. The native preflight remains responsible
+for sample-level finite-audio, continuous-output, and final note-cleanup
+assertions; the physical run supplies the missing uninterrupted wall-clock
+target evidence.
+
+Digital capture from the NT would require adding the separate **USB audio (to
+host)** algorithm. This harness does not add it, because the approved physical
+preset must contain only `NsIb`.
+
+With the physical NT and `nt_helper` connected, the repeatable harness is:
+
+```sh
+make hardware-endurance
+```
+
+It reruns the accelerated native endurance and ARM preflight, creates a preset
+containing only eight-voice `NsIb`, applies the full valid sound-control
+settings, mirrors the committed native dense-MIDI pattern for 30 wall-clock
+minutes, and polls the live preset and CPU state every ten seconds through
+`nt_helper` MCP. After MIDI cleanup it waits through the release and performs a
+final physical response check. It writes a JSON report under
+`verification/hardware-runs/` and submits AC-004 evidence only after a complete
+pass. Use `make hardware-endurance-smoke` to exercise the same physical
+plumbing for five seconds without submitting evidence.
 
 ## AC-004 pass record
 

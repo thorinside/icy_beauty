@@ -8,6 +8,7 @@ ARM_CXX ?= arm-none-eabi-c++
 ARM_NM ?= arm-none-eabi-nm
 ARM_READELF ?= arm-none-eabi-readelf
 NATIVE_CXX ?= c++
+PYTHON ?= python3
 
 PLUGIN := plugins/$(PLUGIN_NAME).o
 NATIVE_TEST := build/$(PLUGIN_NAME)_test
@@ -36,6 +37,20 @@ test: $(NATIVE_TEST)
 endurance: $(NATIVE_TEST)
 	./$(NATIVE_TEST) --endurance
 
+script-test:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest \
+		tests/target_hardware_endurance_test.py -v
+
+hardware-endurance: $(PLUGIN)
+	$(PYTHON) scripts/target_hardware_endurance.py
+
+hardware-endurance-smoke: $(PLUGIN)
+	$(PYTHON) scripts/target_hardware_endurance.py \
+		--duration-seconds 5 --post-release-seconds 10 \
+		--responsiveness-interval-seconds 2 \
+		--run-dir build/hardware-endurance-smoke \
+		--no-submit-evidence
+
 inspect: $(PLUGIN)
 	@$(ARM_READELF) -h $(PLUGIN) | grep -Eq 'Type:[[:space:]]+REL' \
 		|| (echo "Plugin is not a relocatable object" >&2; exit 1)
@@ -50,9 +65,10 @@ inspect: $(PLUGIN)
 	@echo "PASS: $(PLUGIN) is a relocatable ARM plugin with pluginEntry"
 	@$(ARM_NM) -u $(PLUGIN)
 
-verify: clean hardware test inspect
+verify: clean hardware test script-test inspect
 
 clean:
 	rm -rf build plugins
 
-.PHONY: all clean endurance hardware inspect test verify
+.PHONY: all clean endurance hardware hardware-endurance \
+	hardware-endurance-smoke inspect script-test test verify
