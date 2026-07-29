@@ -556,16 +556,62 @@ int main(int argc, char** argv) {
         factory->specifications[0].def != 4)
         return fail("voice-count specification does not expose voices 1 through 8");
 
-    int32_t oneVoiceSpec[] = {1};
-    int32_t eightVoiceSpec[] = {8};
-    _NT_algorithmRequirements oneVoiceRequirements = {};
-    _NT_algorithmRequirements eightVoiceRequirements = {};
-    factory->calculateRequirements(oneVoiceRequirements, oneVoiceSpec);
-    factory->calculateRequirements(eightVoiceRequirements, eightVoiceSpec);
-    if (oneVoiceRequirements.numParameters != 10 ||
-        eightVoiceRequirements.numParameters != 17 ||
-        eightVoiceRequirements.sram == 0 || eightVoiceRequirements.dtc == 0)
-        return fail("voice count does not determine the focused parameter count");
+    for (int configuredVoices = 1; configuredVoices <= kMaxVoices;
+         ++configuredVoices) {
+        HostInstance cvSurface(factory, configuredVoices);
+        if (cvSurface.requirements.numParameters !=
+                static_cast<uint32_t>(kNumCommonParameters + 1 +
+                                      configuredVoices +
+                                      kNumSoundParameters) ||
+            cvSurface.requirements.sram == 0 ||
+            cvSurface.requirements.dtc == 0 ||
+            cvSurface.synth()->voiceCount != configuredVoices)
+            return fail("voice count does not determine the focused parameter count");
+
+        const _NT_parameterPages* cvPages =
+            cvSurface.algorithm->parameterPages;
+        if (cvPages == NULL || cvPages->numPages != 4 ||
+            std::strcmp(cvPages->pages[2].name, "CV/Gate") != 0 ||
+            cvPages->pages[2].numParams != configuredVoices + 1 ||
+            cvPages->pages[2].params[0] != kParamGate)
+            return fail("CV/Gate page does not follow the configured voice count");
+
+        int cvInputCount = 0;
+        for (uint32_t parameter = 0;
+             parameter < cvSurface.requirements.numParameters; ++parameter) {
+            if (cvSurface.algorithm->parameters[parameter].unit ==
+                kNT_unitCvInput)
+                ++cvInputCount;
+        }
+        if (cvInputCount != configuredVoices + 1 ||
+            cvSurface.algorithm->parameters[kParamGate].unit !=
+                kNT_unitCvInput ||
+            cvSurface.values[kParamGate] != 1)
+            return fail("CV surface must contain only Gate and configured pitches");
+
+        for (int voice = 0; voice < configuredVoices; ++voice) {
+            const int parameter = kParamPitchFirst + voice;
+            if (cvPages->pages[2].params[voice + 1] != parameter ||
+                std::strcmp(cvSurface.algorithm->parameters[parameter].name,
+                            kPitchNames[voice]) != 0 ||
+                cvSurface.algorithm->parameters[parameter].unit !=
+                    kNT_unitCvInput ||
+                cvSurface.values[parameter] != voice + 2)
+                return fail("pitch CV inputs are not presented sequentially");
+        }
+
+        for (int control = 0; control < kNumSoundParameters; ++control) {
+            const int parameter = cvSurface.synth()->soundParameter(
+                static_cast<SoundParameter>(control));
+            if (cvPages->pages[1].params[control] != parameter ||
+                cvSurface.algorithm->parameters[parameter].unit !=
+                    kNT_unitPercent)
+                return fail("sound controls must remain ordinary host parameters");
+        }
+    }
+    std::puts(
+        "PASS: voice counts 1..8 expose only Gate plus sequential Pitch CV "
+        "inputs; sound controls remain host-mappable parameters");
 
     HostInstance midi(factory, 4);
     if (midi.algorithm == NULL || midi.algorithm->parameters == NULL ||
@@ -575,18 +621,8 @@ int main(int argc, char** argv) {
         return fail("fresh-load audio is not routed to Output 1");
     if (midi.values[kParamMidiChannel] != 0)
         return fail("fresh-load MIDI selection is not Omni");
-    if (std::strcmp(midi.algorithm->parameters[kParamGate].name, "Gate") != 0 ||
-        midi.algorithm->parameters[kParamGate].unit != kNT_unitCvInput ||
-        midi.values[kParamGate] != 1)
-        return fail("CV Gate is not exposed on Input 1 by default");
-    for (int voice = 0; voice < 4; ++voice) {
-        const int parameter = kParamPitchFirst + voice;
-        if (std::strcmp(midi.algorithm->parameters[parameter].name,
-                        kPitchNames[voice]) != 0 ||
-            midi.algorithm->parameters[parameter].unit != kNT_unitCvInput ||
-            midi.values[parameter] != voice + 2)
-            return fail("pitch CV inputs are not presented sequentially");
-    }
+    if (std::strcmp(midi.algorithm->parameters[kParamGate].name, "Gate") != 0)
+        return fail("CV Gate has the wrong host parameter name");
     const _NT_parameterPages* pages = midi.algorithm->parameterPages;
     if (pages->numPages != 4 ||
         std::strcmp(pages->pages[0].name, "Setup") != 0 ||
