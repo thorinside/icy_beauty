@@ -153,6 +153,141 @@ double renderSoundControlDifference(const _NT_factory* factory,
     return difference / (totalBlocks * frames);
 }
 
+struct ControlRender {
+    std::vector<float> low;
+    std::vector<float> high;
+};
+
+ControlRender renderControlExtremes(const _NT_factory* factory,
+                                    SoundParameter control,
+                                    int totalBlocks, int noteOffBlock) {
+    const int frames = 64;
+    HostInstance low(factory, 1);
+    HostInstance high(factory, 1);
+    low.values[kParamOutputMode] = 1;
+    high.values[kParamOutputMode] = 1;
+    for (int index = 0; index < kNumSoundParameters; ++index) {
+        const SoundParameter parameter =
+            static_cast<SoundParameter>(index);
+        low.values[low.synth()->soundParameter(parameter)] = 50;
+        high.values[high.synth()->soundParameter(parameter)] = 50;
+    }
+
+    low.values[low.synth()->soundParameter(kSoundMotion)] = 0;
+    high.values[high.synth()->soundParameter(kSoundMotion)] = 0;
+    low.values[low.synth()->soundParameter(kSoundGrain)] = 0;
+    high.values[high.synth()->soundParameter(kSoundGrain)] = 0;
+    low.values[low.synth()->soundParameter(kSoundResonance)] = 0;
+    high.values[high.synth()->soundParameter(kSoundResonance)] = 0;
+    low.values[low.synth()->soundParameter(control)] = 0;
+    high.values[high.synth()->soundParameter(control)] = 100;
+
+    factory->midiMessage(low.algorithm, 0x90, 57, 100);
+    factory->midiMessage(high.algorithm, 0x90, 57, 100);
+
+    std::vector<float> lowBusses(kNT_lastBus * frames, 0.0f);
+    std::vector<float> highBusses(kNT_lastBus * frames, 0.0f);
+    ControlRender rendered;
+    rendered.low.reserve(totalBlocks * frames);
+    rendered.high.reserve(totalBlocks * frames);
+    for (int block = 0; block < totalBlocks; ++block) {
+        if (block == noteOffBlock) {
+            factory->midiMessage(low.algorithm, 0x80, 57, 0);
+            factory->midiMessage(high.algorithm, 0x80, 57, 0);
+        }
+        std::fill(lowBusses.begin(), lowBusses.end(), 0.0f);
+        std::fill(highBusses.begin(), highBusses.end(), 0.0f);
+        factory->step(low.algorithm, lowBusses.data(), frames / 4);
+        factory->step(high.algorithm, highBusses.data(), frames / 4);
+        const float* lowOutput = lowBusses.data() + 12 * frames;
+        const float* highOutput = highBusses.data() + 12 * frames;
+        rendered.low.insert(rendered.low.end(), lowOutput,
+                            lowOutput + frames);
+        rendered.high.insert(rendered.high.end(), highOutput,
+                             highOutput + frames);
+    }
+    return rendered;
+}
+
+bool isFiniteAndAudible(const std::vector<float>& audio) {
+    float peak = 0.0f;
+    for (std::size_t index = 0; index < audio.size(); ++index) {
+        if (!std::isfinite(audio[index]))
+            return false;
+        peak = std::max(peak, std::fabs(audio[index]));
+    }
+    return peak > 0.1f;
+}
+
+double normalizedDifference(const std::vector<float>& audio, int order) {
+    const std::size_t start = 24000;
+    double signalEnergy = 0.0;
+    double differenceEnergy = 0.0;
+    for (std::size_t index = start + order; index < audio.size(); ++index) {
+        const double sample = audio[index];
+        signalEnergy += sample * sample;
+        if (order == 1) {
+            const double difference = sample - audio[index - 1];
+            differenceEnergy += difference * difference;
+        } else {
+            const double difference =
+                sample - 2.0 * audio[index - 1] + audio[index - 2];
+            differenceEnergy += difference * difference;
+        }
+    }
+    return signalEnergy > 0.0
+               ? std::sqrt(differenceEnergy / signalEnergy)
+               : 0.0;
+}
+
+double componentMagnitude(const std::vector<float>& audio,
+                          double frequency) {
+    const std::size_t start = 24000;
+    const std::size_t count = 48000;
+    const double twoPi = 6.28318530717958647692;
+    double real = 0.0;
+    double imaginary = 0.0;
+    for (std::size_t index = 0; index < count; ++index) {
+        const double phase =
+            twoPi * frequency * index / NT_globals.sampleRate;
+        real += audio[start + index] * std::cos(phase);
+        imaginary -= audio[start + index] * std::sin(phase);
+    }
+    return 2.0 * std::sqrt(real * real + imaginary * imaginary) / count;
+}
+
+double tailRms(const std::vector<float>& audio) {
+    const std::size_t start = 24000;
+    double energy = 0.0;
+    for (std::size_t index = start; index < audio.size(); ++index)
+        energy += audio[index] * audio[index];
+    return std::sqrt(energy / (audio.size() - start));
+}
+
+double motionPhaseExcursion(const _NT_factory* factory, int motion) {
+    const int frames = 64;
+    HostInstance host(factory, 1);
+    host.values[kParamOutputMode] = 1;
+    host.values[host.synth()->soundParameter(kSoundMotion)] = motion;
+    host.values[host.synth()->soundParameter(kSoundGrain)] = 0;
+    host.values[host.synth()->soundParameter(kSoundResonance)] = 0;
+    factory->midiMessage(host.algorithm, 0x90, 57, 100);
+
+    std::vector<float> busses(kNT_lastBus * frames, 0.0f);
+    uint32_t minimumDelta = 0xffffffffU;
+    uint32_t maximumDelta = 0;
+    for (int block = 0; block < 1500; ++block) {
+        const uint32_t phaseBefore =
+            host.synth()->dtc->voices[0].fundamentalPhase;
+        factory->step(host.algorithm, busses.data(), frames / 4);
+        const uint32_t phaseDelta =
+            host.synth()->dtc->voices[0].fundamentalPhase - phaseBefore;
+        minimumDelta = std::min(minimumDelta, phaseDelta);
+        maximumDelta = std::max(maximumDelta, phaseDelta);
+    }
+    return static_cast<double>(maximumDelta - minimumDelta);
+}
+
 void sendInitialEnduranceChord(const _NT_factory* factory,
                                _NT_algorithm* algorithm,
                                uint8_t notes[kMaxVoices]) {
@@ -357,6 +492,67 @@ int main(int argc, char** argv) {
         if (difference < 0.0005)
             return fail("a focused sound control did not change rendered audio");
     }
+
+    const int semanticBlocks = 1500;
+    const ControlRender tone = renderControlExtremes(
+        factory, kSoundTone, semanticBlocks, -1);
+    const ControlRender motion = renderControlExtremes(
+        factory, kSoundMotion, semanticBlocks, -1);
+    const ControlRender grain = renderControlExtremes(
+        factory, kSoundGrain, semanticBlocks, -1);
+    const ControlRender resonance = renderControlExtremes(
+        factory, kSoundResonance, semanticBlocks, -1);
+    const ControlRender release = renderControlExtremes(
+        factory, kSoundRelease, semanticBlocks, 100);
+    const ControlRender* const semanticRenders[] = {
+        &tone, &motion, &grain, &resonance, &release,
+    };
+    for (int control = 0; control < kNumSoundParameters; ++control) {
+        if (!isFiniteAndAudible(semanticRenders[control]->low) ||
+            !isFiniteAndAudible(semanticRenders[control]->high))
+            return fail("a sound-control extreme was silent or non-finite");
+    }
+
+    const double toneBrightnessRatio =
+        normalizedDifference(tone.high, 1) /
+        normalizedDifference(tone.low, 1);
+    if (toneBrightnessRatio < 1.35)
+        return fail("Tone did not move from dark toward glassy brightness");
+
+    const double lowMotionExcursion = motionPhaseExcursion(factory, 0);
+    const double highMotionExcursion = motionPhaseExcursion(factory, 100);
+    const double audibleMotionExcursion =
+        phaseIncrementForNote(57) * 64.0 * 0.005;
+    if (lowMotionExcursion > 1.0 ||
+        highMotionExcursion < audibleMotionExcursion)
+        return fail("Motion did not add animated pitch instability");
+
+    const double grainRoughnessRatio =
+        normalizedDifference(grain.high, 2) /
+        normalizedDifference(grain.low, 2);
+    if (grainRoughnessRatio < 5.0)
+        return fail("Grain did not add a clearly stronger noisy texture");
+
+    const double lowResonanceRatio =
+        componentMagnitude(resonance.low, 440.0) /
+        componentMagnitude(resonance.low, 220.0);
+    const double highResonanceRatio =
+        componentMagnitude(resonance.high, 440.0) /
+        componentMagnitude(resonance.high, 220.0);
+    if (highResonanceRatio < lowResonanceRatio * 1.4)
+        return fail("Resonance did not strengthen the tuned upper spectrum");
+
+    const double shortReleaseTail = tailRms(release.low);
+    const double longReleaseTail = tailRms(release.high);
+    if (shortReleaseTail > 0.001 || longReleaseTail < 0.05)
+        return fail("Release did not range from short to haunting tails");
+
+    std::printf(
+        "PASS: control semantics: Tone %.2fx brighter, Motion %.0f phase "
+        "excursion, Grain %.2fx rougher, Resonance %.2fx stronger harmonic, "
+        "Release %.3f long-tail RMS\n",
+        toneBrightnessRatio, highMotionExcursion, grainRoughnessRatio,
+        highResonanceRatio / lowResonanceRatio, longReleaseTail);
 
     const int frames = 64;
     std::vector<float> busses(kNT_lastBus * frames, 0.0f);

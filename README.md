@@ -25,7 +25,7 @@ make verify
 
 The installable module product is `plugins/icy_beauty.o`. Copy that relocatable object to the disting NT plug-ins folder using the module's supported SD-card workflow.
 
-`make verify` rebuilds the ARM Cortex-M7 object, runs a native host-contract/render test, and inspects the object architecture and `pluginEntry` export.
+`make verify` rebuilds the ARM Cortex-M7 object, runs a native host-contract/render test, characterizes the five controls at their extremes (brightness, pitch animation, noise roughness, tuned resonance, and release-tail duration), and inspects the object architecture and `pluginEntry` export.
 
 `make endurance` additionally simulates 30 minutes of continuous eight-voice dense MIDI. It cycles eight-note note-on/note-off activity, voice replacement, sustain, velocity, pitch bend, modulation wheel, channel pressure, and polyphonic pressure while checking every rendered sample, one-second audio continuity, and final voice release. This accelerated native check is a regression test, not a substitute for the required 30-minute run on a physical disting NT. See [`TARGET_VALIDATION.md`](TARGET_VALIDATION.md) for the target procedure and remaining acceptance evidence.
 
