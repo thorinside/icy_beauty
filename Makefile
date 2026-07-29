@@ -33,6 +33,9 @@ $(NATIVE_TEST): $(SOURCE) tests/icy_beauty_test.cpp $(API_DIR)/include/distingnt
 test: $(NATIVE_TEST)
 	./$(NATIVE_TEST)
 
+endurance: $(NATIVE_TEST)
+	./$(NATIVE_TEST) --endurance
+
 inspect: $(PLUGIN)
 	@$(ARM_READELF) -h $(PLUGIN) | grep -Eq 'Type:[[:space:]]+REL' \
 		|| (echo "Plugin is not a relocatable object" >&2; exit 1)
@@ -52,4 +55,4 @@ verify: clean hardware test inspect
 clean:
 	rm -rf build plugins
 
-.PHONY: all clean hardware inspect test verify
+.PHONY: all clean endurance hardware inspect test verify

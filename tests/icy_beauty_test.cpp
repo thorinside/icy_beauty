@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <vector>
 
 const _NT_globals NT_globals = {
@@ -100,9 +101,131 @@ int heldMidiVoiceCount(const IcyBeautyAlgorithm* algorithm) {
     return count;
 }
 
+void makeEnduranceChord(uint32_t generation, uint8_t notes[kMaxVoices]) {
+    static const uint8_t kIntervals[kMaxVoices] = {
+        0, 3, 7, 10, 14, 17, 21, 24,
+    };
+    const uint8_t root = static_cast<uint8_t>(36 + generation % 48);
+    for (uint8_t index = 0; index < kMaxVoices; ++index)
+        notes[index] = root + kIntervals[index];
+}
+
+void sendInitialEnduranceChord(const _NT_factory* factory,
+                               _NT_algorithm* algorithm,
+                               uint8_t notes[kMaxVoices]) {
+    makeEnduranceChord(0, notes);
+    for (uint8_t index = 0; index < kMaxVoices; ++index) {
+        const uint8_t velocity = static_cast<uint8_t>(48 + index * 10);
+        factory->midiMessage(algorithm, 0x90, notes[index], velocity);
+    }
+}
+
+void sendDenseMidiActivity(const _NT_factory* factory,
+                           _NT_algorithm* algorithm, uint32_t generation,
+                           uint8_t notes[kMaxVoices]) {
+    factory->midiMessage(algorithm, 0xb0, 64, 127);
+    for (uint8_t index = 0; index < kMaxVoices; ++index)
+        factory->midiMessage(algorithm, 0x80, notes[index], 0);
+
+    factory->midiMessage(
+        algorithm, 0xb0, 1, static_cast<uint8_t>((generation * 29) & 0x7fU));
+    static const uint16_t kBendValues[] = {0, 8192, 16383, 8192};
+    const uint16_t bend = kBendValues[generation % 4];
+    factory->midiMessage(algorithm, 0xe0,
+                         static_cast<uint8_t>(bend & 0x7fU),
+                         static_cast<uint8_t>((bend >> 7) & 0x7fU));
+    factory->midiMessage(
+        algorithm, 0xd0, static_cast<uint8_t>((generation * 37) & 0x7fU), 0);
+
+    uint8_t nextNotes[kMaxVoices];
+    makeEnduranceChord(generation, nextNotes);
+    for (uint8_t index = 0; index < kMaxVoices; ++index) {
+        const uint8_t velocity = static_cast<uint8_t>(32 +
+            ((generation * 17 + index * 11) % 96));
+        const uint8_t pressure = static_cast<uint8_t>(
+            (generation * 23 + index * 13) & 0x7fU);
+        factory->midiMessage(algorithm, 0x90, nextNotes[index], velocity);
+        factory->midiMessage(algorithm, 0xa0, nextNotes[index], pressure);
+        notes[index] = nextNotes[index];
+    }
+    factory->midiMessage(algorithm, 0xb0, 64, 0);
+}
+
+int runDenseMidiEndurance(const _NT_factory* factory) {
+    const int frames = 64;
+    const uint32_t sampleRate = NT_globals.sampleRate;
+    const uint32_t durationMinutes = 30;
+    const uint32_t totalBlocks =
+        durationMinutes * 60U * sampleRate / frames;
+    const uint32_t blocksPerSecond = sampleRate / frames;
+    const uint32_t activityIntervalBlocks = blocksPerSecond / 2U;
+
+    HostInstance endurance(factory, kMaxVoices);
+    endurance.values[kParamOutputMode] = 1;
+    std::vector<float> busses(kNT_lastBus * frames, 0.0f);
+    uint8_t notes[kMaxVoices];
+    sendInitialEnduranceChord(factory, endurance.algorithm, notes);
+
+    double oneSecondEnergy = 0.0;
+    uint32_t generation = 1;
+    const std::clock_t started = std::clock();
+    for (uint32_t block = 0; block < totalBlocks; ++block) {
+        factory->step(endurance.algorithm, busses.data(), frames / 4);
+        const float* output = busses.data() + 12 * frames;
+        for (int frame = 0; frame < frames; ++frame) {
+            if (!std::isfinite(output[frame]))
+                return fail("dense MIDI endurance produced a non-finite sample");
+            oneSecondEnergy += std::fabs(output[frame]);
+        }
+
+        if ((block + 1) % blocksPerSecond == 0) {
+            if (oneSecondEnergy < 1.0)
+                return fail("dense MIDI endurance detected a silent one-second window");
+            oneSecondEnergy = 0.0;
+        }
+        if ((block + 1) % activityIntervalBlocks == 0 &&
+            block + 1 < totalBlocks) {
+            sendDenseMidiActivity(factory, endurance.algorithm,
+                                  generation++, notes);
+        }
+    }
+
+    factory->midiMessage(endurance.algorithm, 0xb0, 64, 0);
+    for (uint8_t index = 0; index < kMaxVoices; ++index)
+        factory->midiMessage(endurance.algorithm, 0x80, notes[index], 0);
+
+    const uint32_t releaseBlocks = 2U * sampleRate / frames;
+    for (uint32_t block = 0; block < releaseBlocks; ++block) {
+        factory->step(endurance.algorithm, busses.data(), frames / 4);
+        const float* output = busses.data() + 12 * frames;
+        for (int frame = 0; frame < frames; ++frame) {
+            if (!std::isfinite(output[frame]))
+                return fail("post-endurance release produced a non-finite sample");
+        }
+    }
+    for (uint8_t index = 0; index < kMaxVoices; ++index) {
+        const Voice& voice = endurance.synth()->dtc->voices[index];
+        if (voice.gate || voice.source != kVoiceUnused)
+            return fail("dense MIDI endurance left a stuck voice");
+    }
+
+    const double elapsedSeconds =
+        static_cast<double>(std::clock() - started) / CLOCKS_PER_SEC;
+    std::printf(
+        "PASS: simulated %u minutes of eight-voice dense MIDI in %.2f seconds "
+        "(%u activity cycles) with finite audio, no silent one-second windows, "
+        "and no stuck voices\n",
+        durationMinutes, elapsedSeconds, generation);
+    return 0;
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    const bool runEndurance =
+        argc == 2 && std::strcmp(argv[1], "--endurance") == 0;
+    if (argc > 1 && !runEndurance)
+        return fail("usage: icy_beauty_test [--endurance]");
     if (pluginEntry(kNT_selector_version, 0) != kNT_apiVersionCurrent)
         return fail("plugin reports the wrong disting NT API version");
     if (pluginEntry(kNT_selector_numFactories, 0) != 1)
@@ -284,5 +407,7 @@ int main() {
         return fail("MIDI replacement did not choose the oldest held voice");
 
     std::puts("PASS: Icy Beauty renders MIDI and voice-count-driven poly CV/gate audio");
+    if (runEndurance)
+        return runDenseMidiEndurance(factory);
     return 0;
 }

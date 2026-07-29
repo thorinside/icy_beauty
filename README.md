@@ -25,6 +25,8 @@ The installable module product is `plugins/icy_beauty.o`. Copy that relocatable 
 
 `make verify` rebuilds the ARM Cortex-M7 object, runs a native host-contract/render test, and inspects the object architecture and `pluginEntry` export.
 
+`make endurance` additionally simulates 30 minutes of continuous eight-voice dense MIDI. It cycles eight-note note-on/note-off activity, voice replacement, sustain, velocity, pitch bend, modulation wheel, channel pressure, and polyphonic pressure while checking every rendered sample, one-second audio continuity, and final voice release. This accelerated native check is a regression test, not a substitute for the required 30-minute run on a physical disting NT. See [`TARGET_VALIDATION.md`](TARGET_VALIDATION.md) for the target procedure and remaining acceptance evidence.
+
 ## Canonical reference
 
 The owner-supplied comparison excerpt is retained locally at `model/cononical.wav`, as required by the approved Spec. It is development reference material only: the build does not read, embed, copy, or package it.
