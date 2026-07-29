@@ -750,6 +750,41 @@ int main(int argc, char** argv) {
         return fail("fresh-load sound controls are not centered with a medium-long release");
 
     {
+        const int latencyFrames = 64;
+        HostInstance latency(factory, 8);
+        latency.values[kParamOutputMode] = 1;
+        for (int control = 0; control < kNumSoundParameters; ++control) {
+            latency.values[latency.synth()->soundParameter(
+                static_cast<SoundParameter>(control))] = 100;
+        }
+        std::vector<float> latencyBusses(
+            kNT_lastBus * latencyFrames, 0.0f);
+        factory->midiMessage(latency.algorithm, 0x90, 72, 127);
+        factory->step(latency.algorithm, latencyBusses.data(),
+                      latencyFrames / 4);
+        const float* latencyOutput =
+            latencyBusses.data() + 12 * latencyFrames;
+        int firstAudibleFrame = -1;
+        for (int frame = 0; frame < latencyFrames; ++frame) {
+            if (!std::isfinite(latencyOutput[frame]))
+                return fail("MIDI onset latency render was non-finite");
+            if (firstAudibleFrame < 0 &&
+                std::fabs(latencyOutput[frame]) > 0.000001f)
+                firstAudibleFrame = frame;
+        }
+        if (firstAudibleFrame < 0)
+            return fail("MIDI callback did not produce audio in the next block");
+        const double callbackToAudioMilliseconds =
+            1000.0 * firstAudibleFrame / NT_globals.sampleRate;
+        if (callbackToAudioMilliseconds >= 10.0)
+            return fail("MIDI callback-to-audio latency reached 10 ms");
+        std::printf(
+            "PASS: MIDI callback-to-audio begins at frame %d (%.3f ms) in "
+            "the maximum-control eight-voice render\n",
+            firstAudibleFrame, callbackToAudioMilliseconds);
+    }
+
+    {
         const int freshFrames = 64;
         HostInstance freshLoad(factory, 4);
         if (freshLoad.values[kParamOutput] != 13 ||

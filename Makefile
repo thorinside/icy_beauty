@@ -38,8 +38,8 @@ endurance: $(NATIVE_TEST)
 	./$(NATIVE_TEST) --endurance
 
 script-test:
-	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest \
-		tests/target_hardware_endurance_test.py -v
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover \
+		-s tests -p '*_test.py' -v
 
 hardware-endurance: $(PLUGIN)
 	$(PYTHON) scripts/target_hardware_endurance.py

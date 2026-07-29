@@ -1,6 +1,6 @@
-# AC-004 target-hardware validation
+# Target-hardware validation
 
-This file defines the repeatable target run; it does **not** record a passing result. The accelerated `make endurance` regression cannot replace physical disting NT evidence.
+This file defines the repeatable target run and identifies the retained passing AC-004 evidence. The accelerated `make endurance` regression cannot replace physical disting NT evidence.
 
 Run this procedure after the approved synthesis surface and MIDI behavior are complete, so the test covers the most CPU-intensive valid eight-voice patch without omitting or reducing any approved feature.
 
@@ -45,9 +45,18 @@ final physical response check. It writes a JSON report under
 pass. Use `make hardware-endurance-smoke` to exercise the same physical
 plumbing for five seconds without submitting evidence.
 
-## AC-004 pass record
+## Retained AC-004 pass record
 
-Record all of the following:
+The physical run retained at
+`verification/hardware-runs/icy-beauty-20260729T205925Z/target-hardware-endurance.json`
+passed on disting NT firmware v1.17.0 with nt_helper 1.39.0. It tested the
+plugin built from `c01865e` at eight voices with Tone, Motion, Grain,
+Resonance, and Release all at 100. The run completed 1,800.007 seconds and
+3,599 dense-MIDI cycles, with 182 successful physical preset/CPU polls and no
+failed checks. Its complete AC-004 evidence was submitted and retained by the
+acceptance tracker. Commit `5050052` records the report.
+
+A qualifying report records all of the following:
 
 - tested firmware and configuration;
 - the exact eight-voice control settings used and why they are the most CPU-intensive valid patch;
@@ -60,3 +69,18 @@ Record all of the following:
 - no approved sound feature disabled, degraded, or adaptively reduced.
 
 Any failed or unobserved item leaves AC-004 incomplete. Preserve the test notes with the build commit and tested firmware/configuration.
+
+## AC-005 processing and latency evidence
+
+Every retained processing-meter value from the passing physical run is at or
+below 29%, which is below the approved 75% ceiling. `make script-test` checks
+all 182 retained polls rather than trusting only the report summary. The native
+render test also proves that, once the host invokes the plug-in's MIDI callback,
+the maximum-control eight-voice patch produces finite audio in the immediately
+following render block.
+
+The remaining AC-005 check is an end-to-end physical measurement from MIDI
+note-on to Output 1 audio onset on the same supported configuration. It must be
+below 10 ms. Native callback timing and the USB MIDI send time alone do not
+replace this physical measurement. Record the maximum measured latency and the
+measurement setup with the target evidence; a value at or above 10 ms fails.
