@@ -101,6 +101,18 @@ int heldMidiVoiceCount(const IcyBeautyAlgorithm* algorithm) {
     return count;
 }
 
+const Voice* findMidiVoice(const IcyBeautyAlgorithm* algorithm,
+                           uint8_t channel, uint8_t note) {
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        const Voice& voice = algorithm->dtc->voices[index];
+        if (voice.source == kVoiceMidi && voice.channel == channel &&
+            voice.note == note) {
+            return &voice;
+        }
+    }
+    return NULL;
+}
+
 void makeEnduranceChord(uint32_t generation, uint8_t notes[kMaxVoices]) {
     static const uint8_t kIntervals[kMaxVoices] = {
         0, 3, 7, 10, 14, 17, 21, 24,
@@ -272,6 +284,80 @@ double motionPhaseExcursion(const _NT_factory* factory, int motion) {
     host.values[host.synth()->soundParameter(kSoundGrain)] = 0;
     host.values[host.synth()->soundParameter(kSoundResonance)] = 0;
     factory->midiMessage(host.algorithm, 0x90, 57, 100);
+
+    std::vector<float> busses(kNT_lastBus * frames, 0.0f);
+    uint32_t minimumDelta = 0xffffffffU;
+    uint32_t maximumDelta = 0;
+    for (int block = 0; block < 1500; ++block) {
+        const uint32_t phaseBefore =
+            host.synth()->dtc->voices[0].fundamentalPhase;
+        factory->step(host.algorithm, busses.data(), frames / 4);
+        const uint32_t phaseDelta =
+            host.synth()->dtc->voices[0].fundamentalPhase - phaseBefore;
+        minimumDelta = std::min(minimumDelta, phaseDelta);
+        maximumDelta = std::max(maximumDelta, phaseDelta);
+    }
+    return static_cast<double>(maximumDelta - minimumDelta);
+}
+
+std::vector<float> renderMidiVelocity(const _NT_factory* factory,
+                                      uint8_t velocity) {
+    const int frames = 64;
+    const int totalBlocks = 1500;
+    HostInstance host(factory, 1);
+    host.values[kParamOutputMode] = 1;
+    host.values[host.synth()->soundParameter(kSoundMotion)] = 0;
+    host.values[host.synth()->soundParameter(kSoundGrain)] = 0;
+    host.values[host.synth()->soundParameter(kSoundResonance)] = 0;
+    factory->midiMessage(host.algorithm, 0x93, 57, velocity);
+
+    std::vector<float> busses(kNT_lastBus * frames, 0.0f);
+    std::vector<float> rendered;
+    rendered.reserve(totalBlocks * frames);
+    for (int block = 0; block < totalBlocks; ++block) {
+        factory->step(host.algorithm, busses.data(), frames / 4);
+        const float* output = busses.data() + 12 * frames;
+        rendered.insert(rendered.end(), output, output + frames);
+    }
+    return rendered;
+}
+
+double steadyRms(const std::vector<float>& audio) {
+    const std::size_t start = 24000;
+    double energy = 0.0;
+    for (std::size_t index = start; index < audio.size(); ++index)
+        energy += audio[index] * audio[index];
+    return std::sqrt(energy / (audio.size() - start));
+}
+
+uint32_t pitchBendPhaseDelta(const _NT_factory* factory, uint16_t bend) {
+    const int frames = 64;
+    HostInstance host(factory, 1);
+    host.values[kParamOutputMode] = 1;
+    host.values[host.synth()->soundParameter(kSoundMotion)] = 0;
+    host.values[host.synth()->soundParameter(kSoundGrain)] = 0;
+    factory->midiMessage(host.algorithm, 0xe4,
+                         static_cast<uint8_t>(bend & 0x7fU),
+                         static_cast<uint8_t>((bend >> 7) & 0x7fU));
+    factory->midiMessage(host.algorithm, 0x94, 57, 100);
+
+    std::vector<float> busses(kNT_lastBus * frames, 0.0f);
+    const uint32_t phaseBefore =
+        host.synth()->dtc->voices[0].fundamentalPhase;
+    factory->step(host.algorithm, busses.data(), frames / 4);
+    return host.synth()->dtc->voices[0].fundamentalPhase - phaseBefore;
+}
+
+double midiWheelMotionExcursion(const _NT_factory* factory,
+                                uint8_t wheel) {
+    const int frames = 64;
+    HostInstance host(factory, 1);
+    host.values[kParamOutputMode] = 1;
+    host.values[host.synth()->soundParameter(kSoundMotion)] = 0;
+    host.values[host.synth()->soundParameter(kSoundGrain)] = 0;
+    host.values[host.synth()->soundParameter(kSoundResonance)] = 0;
+    factory->midiMessage(host.algorithm, 0xb5, 1, wheel);
+    factory->midiMessage(host.algorithm, 0x95, 57, 100);
 
     std::vector<float> busses(kNT_lastBus * frames, 0.0f);
     uint32_t minimumDelta = 0xffffffffU;
@@ -554,8 +640,80 @@ int main(int argc, char** argv) {
         toneBrightnessRatio, highMotionExcursion, grainRoughnessRatio,
         highResonanceRatio / lowResonanceRatio, longReleaseTail);
 
+    const std::vector<float> lowVelocity =
+        renderMidiVelocity(factory, 32);
+    const std::vector<float> highVelocity =
+        renderMidiVelocity(factory, 112);
+    if (!isFiniteAndAudible(lowVelocity) ||
+        !isFiniteAndAudible(highVelocity))
+        return fail("velocity response produced silent or non-finite audio");
+    const double velocityLoudnessRatio =
+        steadyRms(highVelocity) / steadyRms(lowVelocity);
+    const double velocityBrightnessRatio =
+        normalizedDifference(highVelocity, 1) /
+        normalizedDifference(lowVelocity, 1);
+    if (velocityLoudnessRatio < 2.5)
+        return fail("higher MIDI velocity did not clearly increase loudness");
+    if (velocityBrightnessRatio < 1.03 ||
+        velocityBrightnessRatio >= velocityLoudnessRatio)
+        return fail("velocity brightness increase was absent or not subtle");
+
+    const double bendDown = pitchBendPhaseDelta(factory, 0);
+    const double bendCenter = pitchBendPhaseDelta(factory, 8192);
+    const double bendUp = pitchBendPhaseDelta(factory, 16383);
+    const double expectedBendDown = std::exp2(-2.0 / 12.0);
+    const double expectedBendUp = std::exp2(2.0 / 12.0);
+    if (std::fabs(bendDown / bendCenter - expectedBendDown) > 0.0001 ||
+        std::fabs(bendUp / bendCenter - expectedBendUp) > 0.0001)
+        return fail("full-scale pitch bend did not reach fixed +/-2 semitones");
+
+    const double wheelLowMotion = midiWheelMotionExcursion(factory, 0);
+    const double wheelHighMotion = midiWheelMotionExcursion(factory, 127);
+    const double wheelAudibleMotion =
+        phaseIncrementForNote(57) * 64.0 * 0.005;
+    if (wheelLowMotion > 1.0 || wheelHighMotion < wheelAudibleMotion)
+        return fail("modulation wheel did not audibly increase Motion");
+
     const int frames = 64;
     std::vector<float> busses(kNT_lastBus * frames, 0.0f);
+    HostInstance sustain(factory, 2);
+    sustain.values[kParamOutputMode] = 1;
+    factory->midiMessage(sustain.algorithm, 0x92, 60, 100);
+    factory->midiMessage(sustain.algorithm, 0xb2, 64, 127);
+    factory->midiMessage(sustain.algorithm, 0x82, 60, 0);
+    const Voice* sustained = findMidiVoice(sustain.synth(), 2, 60);
+    if (sustained == NULL || sustained->keyHeld || !sustained->gate)
+        return fail("sustain pedal down did not hold a released key");
+    float sustainPeak = 0.0f;
+    for (int block = 0; block < 64; ++block) {
+        std::fill(busses.begin(), busses.end(), 0.0f);
+        factory->step(sustain.algorithm, busses.data(), frames / 4);
+        const float* output = busses.data() + 12 * frames;
+        for (int frame = 0; frame < frames; ++frame)
+            sustainPeak = std::max(sustainPeak, std::fabs(output[frame]));
+    }
+    if (sustainPeak < 0.1f)
+        return fail("sustain pedal did not keep released-key audio sounding");
+    factory->midiMessage(sustain.algorithm, 0x92, 64, 100);
+    factory->midiMessage(sustain.algorithm, 0xb2, 64, 0);
+    sustained = findMidiVoice(sustain.synth(), 2, 60);
+    const Voice* heldThroughPedalUp =
+        findMidiVoice(sustain.synth(), 2, 64);
+    if (sustained == NULL || sustained->gate ||
+        heldThroughPedalUp == NULL || !heldThroughPedalUp->keyHeld ||
+        !heldThroughPedalUp->gate)
+        return fail("sustain pedal up did not release only unheld keys");
+    factory->midiMessage(sustain.algorithm, 0x82, 64, 0);
+    if (heldThroughPedalUp->gate)
+        return fail("held key did not release normally after sustain pedal up");
+
+    std::printf(
+        "PASS: MIDI expression: velocity %.2fx louder/%.2fx brighter, "
+        "pitch bend %.4fx..%.4fx, mod-wheel Motion %.0f excursion, sustain "
+        "holds and releases keys conventionally\n",
+        velocityLoudnessRatio, velocityBrightnessRatio,
+        bendDown / bendCenter, bendUp / bendCenter, wheelHighMotion);
+
     factory->midiMessage(midi.algorithm, 0x99, 69, 112);
 
     float soundingPeak = 0.0f;
@@ -666,6 +824,20 @@ int main(int argc, char** argv) {
     }
     if (eightVoicePeak < 0.1f)
         return fail("eight occupied MIDI voices did not render audible output");
+
+    HostInstance sustainedReplacement(factory, 8);
+    for (uint8_t note = 60; note < 68; ++note)
+        factory->midiMessage(sustainedReplacement.algorithm,
+                             0x90, note, 100);
+    factory->midiMessage(sustainedReplacement.algorithm, 0xb0, 64, 127);
+    factory->midiMessage(sustainedReplacement.algorithm, 0x80, 61, 0);
+    factory->midiMessage(sustainedReplacement.algorithm, 0x80, 65, 0);
+    factory->midiMessage(sustainedReplacement.algorithm, 0x90, 80, 100);
+    if (heldMidiVoiceCount(sustainedReplacement.synth()) != 8 ||
+        hasHeldMidiNote(sustainedReplacement.synth(), 61) ||
+        !hasHeldMidiNote(sustainedReplacement.synth(), 65) ||
+        !hasHeldMidiNote(sustainedReplacement.synth(), 80))
+        return fail("MIDI replacement did not choose the oldest unheld key");
 
     HostInstance heldReplacement(factory, 8);
     for (uint8_t note = 60; note < 68; ++note)

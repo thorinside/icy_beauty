@@ -33,6 +33,7 @@ struct Voice {
     uint32_t fundamentalPhase;
     uint32_t glassPhase;
     uint32_t motionPhase;
+    uint32_t basePhaseIncrement;
     uint32_t phaseIncrement;
     uint32_t noiseState;
     uint32_t age;
@@ -42,13 +43,18 @@ struct Voice {
     float resonatorLow;
     float resonatorBand;
     uint8_t note;
+    uint8_t channel;
     uint8_t source;
     bool gate;
+    bool keyHeld;
 };
 
 struct IcyBeautyDtc {
     Voice voices[kMaxVoices];
+    float pitchBendScale[16];
     uint32_t nextAge;
+    uint8_t modWheel[16];
+    bool sustainPedal[16];
     bool cvGateHigh;
 };
 
@@ -216,6 +222,7 @@ void clearVoice(Voice& voice) {
     voice.fundamentalPhase = 0;
     voice.glassPhase = 0x40000000U;
     voice.motionPhase = 0;
+    voice.basePhaseIncrement = 0;
     voice.phaseIncrement = 0;
     voice.noiseState = 1;
     voice.age = 0;
@@ -225,8 +232,10 @@ void clearVoice(Voice& voice) {
     voice.resonatorLow = 0.0f;
     voice.resonatorBand = 0.0f;
     voice.note = 0;
+    voice.channel = 0;
     voice.source = kVoiceUnused;
     voice.gate = false;
+    voice.keyHeld = false;
 }
 
 _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& memory,
@@ -240,6 +249,13 @@ _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& memory,
 
     for (int voice = 0; voice < kMaxVoices; ++voice)
         clearVoice(dtc->voices[voice]);
+    volatile uint8_t* const modWheel = dtc->modWheel;
+    volatile bool* const sustainPedal = dtc->sustainPedal;
+    for (int channel = 0; channel < 16; ++channel) {
+        dtc->pitchBendScale[channel] = 1.0f;
+        modWheel[channel] = 0;
+        sustainPedal[channel] = false;
+    }
     dtc->nextAge = 0;
     dtc->cvGateHigh = false;
 
@@ -280,11 +296,25 @@ uint32_t phaseIncrementForPitchCv(float volts) {
     return phaseIncrementForFrequency(zeroVoltFrequency * exp2f(volts));
 }
 
+float pitchBendScale(uint16_t bend) {
+    const float normalized = bend >= 8192U
+                                 ? (bend - 8192U) * (1.0f / 8191.0f)
+                                 : (static_cast<int32_t>(bend) - 8192) *
+                                       (1.0f / 8192.0f);
+    return exp2f(normalized * (2.0f / 12.0f));
+}
+
 void startVoice(IcyBeautyDtc* dtc, Voice& voice, uint8_t source,
-                uint8_t note, uint32_t phaseIncrement, float velocity) {
+                uint8_t channel, uint8_t note,
+                uint32_t basePhaseIncrement, float velocity) {
     voice.fundamentalPhase = 0;
     voice.glassPhase = 0x40000000U;
-    voice.phaseIncrement = phaseIncrement;
+    voice.basePhaseIncrement = basePhaseIncrement;
+    voice.phaseIncrement = source == kVoiceMidi
+                               ? static_cast<uint32_t>(
+                                     basePhaseIncrement *
+                                     dtc->pitchBendScale[channel])
+                               : basePhaseIncrement;
     voice.age = ++dtc->nextAge;
     voice.motionPhase = 0x9e3779b9U * voice.age;
     voice.noiseState = 0x6d2b79f5U ^ (voice.age * 0x85ebca6bU) ^ note;
@@ -296,8 +326,10 @@ void startVoice(IcyBeautyDtc* dtc, Voice& voice, uint8_t source,
     voice.resonatorLow = 0.0f;
     voice.resonatorBand = 0.0f;
     voice.note = note;
+    voice.channel = channel;
     voice.source = source;
     voice.gate = true;
+    voice.keyHeld = source == kVoiceMidi;
 }
 
 Voice* oldestVoiceMatching(IcyBeautyAlgorithm* algorithm, uint8_t source,
@@ -315,8 +347,24 @@ Voice* oldestVoiceMatching(IcyBeautyAlgorithm* algorithm, uint8_t source,
     return oldest;
 }
 
+Voice* oldestReleasedMidiVoice(IcyBeautyAlgorithm* algorithm) {
+    Voice* oldest = NULL;
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        Voice& voice = algorithm->dtc->voices[index];
+        if (voice.source != kVoiceMidi || voice.keyHeld)
+            continue;
+        if (oldest == NULL || voice.age < oldest->age)
+            oldest = &voice;
+    }
+    return oldest;
+}
+
 Voice* selectMidiVoice(IcyBeautyAlgorithm* algorithm) {
     Voice* selected = oldestVoiceMatching(algorithm, 0xffU, true, false);
+    if (selected != NULL)
+        return selected;
+
+    selected = oldestReleasedMidiVoice(algorithm);
     if (selected != NULL)
         return selected;
 
@@ -327,6 +375,35 @@ Voice* selectMidiVoice(IcyBeautyAlgorithm* algorithm) {
     return oldestVoiceMatching(algorithm, 0xffU, true, true);
 }
 
+void setPitchBend(IcyBeautyAlgorithm* algorithm, uint8_t channel,
+                  uint16_t bend) {
+    const float scale = pitchBendScale(bend);
+    algorithm->dtc->pitchBendScale[channel] = scale;
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        Voice& voice = algorithm->dtc->voices[index];
+        if (voice.source == kVoiceMidi && voice.channel == channel) {
+            voice.phaseIncrement = static_cast<uint32_t>(
+                voice.basePhaseIncrement * scale);
+        }
+    }
+}
+
+void setSustainPedal(IcyBeautyAlgorithm* algorithm, uint8_t channel,
+                     bool down) {
+    const bool wasDown = algorithm->dtc->sustainPedal[channel];
+    algorithm->dtc->sustainPedal[channel] = down;
+    if (!wasDown || down)
+        return;
+
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        Voice& voice = algorithm->dtc->voices[index];
+        if (voice.source == kVoiceMidi && voice.channel == channel &&
+            !voice.keyHeld) {
+            voice.gate = false;
+        }
+    }
+}
+
 void midiMessage(_NT_algorithm* self, uint8_t status, uint8_t data1,
                  uint8_t data2) {
     IcyBeautyAlgorithm* algorithm = static_cast<IcyBeautyAlgorithm*>(self);
@@ -334,18 +411,32 @@ void midiMessage(_NT_algorithm* self, uint8_t status, uint8_t data1,
         return;
 
     const uint8_t message = status & 0xf0U;
+    const uint8_t channel = status & 0x0fU;
     if (message == 0x90U && data2 != 0) {
         Voice* voice = selectMidiVoice(algorithm);
-        startVoice(algorithm->dtc, *voice, kVoiceMidi, data1,
+        startVoice(algorithm->dtc, *voice, kVoiceMidi, channel, data1,
                    phaseIncrementForNote(data1),
                    data2 * (1.0f / 127.0f));
     } else if (message == 0x80U ||
                (message == 0x90U && data2 == 0)) {
         for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
             Voice& voice = algorithm->dtc->voices[index];
-            if (voice.source == kVoiceMidi && voice.note == data1)
-                voice.gate = false;
+            if (voice.source == kVoiceMidi && voice.channel == channel &&
+                voice.note == data1) {
+                voice.keyHeld = false;
+                if (!algorithm->dtc->sustainPedal[channel])
+                    voice.gate = false;
+            }
         }
+    } else if (message == 0xb0U) {
+        if (data1 == 1U)
+            algorithm->dtc->modWheel[channel] = data2 & 0x7fU;
+        else if (data1 == 64U)
+            setSustainPedal(algorithm, channel, data2 >= 64U);
+    } else if (message == 0xe0U) {
+        const uint16_t bend = static_cast<uint16_t>(data1 & 0x7fU) |
+                              (static_cast<uint16_t>(data2 & 0x7fU) << 7);
+        setPitchBend(algorithm, channel, bend);
     }
 }
 
@@ -379,7 +470,7 @@ void triggerCvVoices(IcyBeautyAlgorithm* algorithm,
         Voice& voice = algorithm->dtc->voices[index];
         if (voice.source == kVoiceMidi && voice.gate)
             continue;
-        startVoice(algorithm->dtc, voice, kVoiceCv, 0,
+        startVoice(algorithm->dtc, voice, kVoiceCv, 0, 0,
                    phaseIncrementForPitchCv(pitchInputs[index][frame]),
                    0.8f);
     }
@@ -401,8 +492,9 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             (algorithm->v[kParamPitchFirst + index] - 1) * numFrames;
         Voice& voice = dtc->voices[index];
         if (voice.source == kVoiceCv && voice.gate) {
-            voice.phaseIncrement =
+            voice.basePhaseIncrement =
                 phaseIncrementForPitchCv(pitchInputs[index][0]);
+            voice.phaseIncrement = voice.basePhaseIncrement;
         }
     }
 
@@ -417,23 +509,33 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     const float toneCoefficient = 0.025f + 0.55f * tone * tone;
     const float fundamentalLevel = 0.82f - 0.28f * tone;
     const float glassLevel = 0.18f + 0.28f * tone;
-    const float motionDepth = motion * 0.0075f;
     const float grainDepth = grain * grain;
-    const uint32_t motionIncrement =
-        phaseIncrementForFrequency(0.08f + 0.92f * motion);
     const float releaseSeconds = 0.08f * exp2f(6.64385619f * release);
     const float releaseRate =
         13.815510558f / (sampleRate * releaseSeconds);
     const float resonatorDamping = 1.3f - 0.95f * resonance;
     float resonatorCoefficient[kMaxVoices];
+    float motionDepth[kMaxVoices];
+    uint32_t motionIncrement[kMaxVoices];
     for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        const Voice& voice = dtc->voices[index];
         const float cyclesPerSample =
-            dtc->voices[index].phaseIncrement * (1.0f / 4294967296.0f);
+            voice.phaseIncrement * (1.0f / 4294967296.0f);
         float coefficient =
             6.0f * cyclesPerSample * (2.01f + 0.7f * tone);
         if (coefficient > 0.55f)
             coefficient = 0.55f;
         resonatorCoefficient[index] = coefficient;
+
+        float effectiveMotion = motion;
+        if (voice.source == kVoiceMidi) {
+            const float wheel =
+                dtc->modWheel[voice.channel] * (1.0f / 127.0f);
+            effectiveMotion += (1.0f - effectiveMotion) * wheel;
+        }
+        motionDepth[index] = effectiveMotion * 0.0075f;
+        motionIncrement[index] = phaseIncrementForFrequency(
+            0.08f + 0.92f * effectiveMotion);
     }
 
     static const float kVoiceGain[kMaxVoices] = {
@@ -452,11 +554,11 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         float mixed = 0.0f;
         for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
             Voice& voice = dtc->voices[index];
-            voice.motionPhase += motionIncrement;
+            voice.motionPhase += motionIncrement[index];
             const float motionSignal = triangle(voice.motionPhase);
             const float noise = nextNoise(voice);
             float frequencyScale =
-                1.0f + motionDepth * motionSignal +
+                1.0f + motionDepth[index] * motionSignal +
                 0.0015f * grainDepth * noise;
             if (frequencyScale < 0.98f)
                 frequencyScale = 0.98f;
@@ -472,11 +574,17 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
             const float envelopeRate = voice.gate ? 0.0045f : releaseRate;
             voice.envelope += envelopeRate * (target - voice.envelope);
 
+            const float velocityBrightness = 0.1f * voice.velocity;
             const float raw =
-                fundamentalLevel * triangle(voice.fundamentalPhase) +
-                glassLevel * triangle(voice.glassPhase) +
+                (fundamentalLevel - 0.4f * velocityBrightness) *
+                    triangle(voice.fundamentalPhase) +
+                (glassLevel + velocityBrightness) *
+                    triangle(voice.glassPhase) +
                 0.14f * grainDepth * noise;
-            voice.toneState += toneCoefficient * (raw - voice.toneState);
+            const float voiceToneCoefficient =
+                toneCoefficient + 0.08f * voice.velocity;
+            voice.toneState +=
+                voiceToneCoefficient * (raw - voice.toneState);
 
             voice.resonatorLow +=
                 resonatorCoefficient[index] * voice.resonatorBand;
