@@ -51,6 +51,15 @@ hardware-endurance-smoke: $(PLUGIN)
 		--run-dir build/hardware-endurance-smoke \
 		--no-submit-evidence
 
+hardware-latency: $(PLUGIN)
+	$(PYTHON) scripts/target_midi_latency.py
+
+hardware-latency-smoke: $(PLUGIN)
+	$(PYTHON) scripts/target_midi_latency.py \
+		--trials 1 --settle-seconds 1 --interval-seconds 1 \
+		--run-dir build/hardware-latency-smoke \
+		--no-submit-evidence
+
 inspect: $(PLUGIN)
 	@$(ARM_READELF) -h $(PLUGIN) | grep -Eq 'Type:[[:space:]]+REL' \
 		|| (echo "Plugin is not a relocatable object" >&2; exit 1)
@@ -71,4 +80,5 @@ clean:
 	rm -rf build plugins
 
 .PHONY: all clean endurance hardware hardware-endurance \
-	hardware-endurance-smoke inspect script-test test verify
+	hardware-endurance-smoke hardware-latency hardware-latency-smoke \
+	inspect script-test test verify

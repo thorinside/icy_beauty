@@ -10,7 +10,12 @@ MIDI velocity controls loudness with a subtler brightness lift. Sustain behaves 
 
 Presets use the disting NT host's standard mechanism. **Voices** is restored as the factory specification so the host reconstructs the matching dynamic parameter surface; the five sound controls, MIDI channel, output routing, Gate and Pitch assignments, and every other exposed setting are ordinary system-managed parameter values. The plug-in has no additional private setting that requires custom preset JSON.
 
-This remains an incremental delivery. The approved 30-minute target-hardware endurance run has passed, including a 29% maximum observed processing load. End-to-end physical MIDI note-on latency and owner listening acceptance remain to be recorded.
+This remains an incremental delivery. The approved 30-minute target-hardware
+endurance run has passed, including a 29% maximum observed processing load.
+The repeatable physical MIDI-note-on latency harness is also implemented; it
+temporarily routes Output 1 through the built-in USB audio (to host) algorithm,
+captures host input 1, and restores the approved NsIb-only preset after the
+test. Owner listening acceptance remains separate.
 
 ## Build
 
@@ -31,7 +36,20 @@ The installable module product is `plugins/icy_beauty.o`. Copy that relocatable 
 
 `make verify` rebuilds the ARM Cortex-M7 object, runs a native host-contract/render test, round-trips a non-default six-voice preset through the host-managed specification and parameter contract, verifies that the untouched fresh-load patch produces finite animated audio and a medium-long tail through Output 1 from Omni MIDI, characterizes the five controls at their extremes (brightness, pitch animation, noise roughness, tuned resonance, and release-tail duration), verifies fixed velocity, sustain, pitch-bend, modulation-wheel, polyphonic-aftertouch, and channel-pressure behavior, and inspects the object architecture and `pluginEntry` export.
 
-`make endurance` additionally simulates 30 minutes of continuous eight-voice dense MIDI. It cycles eight-note note-on/note-off activity, voice replacement, sustain, velocity, pitch bend, modulation wheel, channel pressure, and polyphonic pressure while checking every rendered sample, one-second audio continuity, and final voice release. This accelerated native check is a regression test, not a substitute for the retained 30-minute run on a physical disting NT. See [`TARGET_VALIDATION.md`](TARGET_VALIDATION.md) for the target procedure, passing endurance/processing evidence, and remaining physical latency measurement.
+`make endurance` additionally simulates 30 minutes of continuous eight-voice dense MIDI. It cycles eight-note note-on/note-off activity, voice replacement, sustain, velocity, pitch bend, modulation wheel, channel pressure, and polyphonic pressure while checking every rendered sample, one-second audio continuity, and final voice release. This accelerated native check is a regression test, not a substitute for the retained 30-minute run on a physical disting NT. See [`TARGET_VALIDATION.md`](TARGET_VALIDATION.md) for the target procedures and retained physical evidence.
+
+With the physical NT connected and `nt_helper` MCP available on port 3847,
+run the guarded latency gate with:
+
+```sh
+make hardware-latency
+```
+
+The first local run may show a macOS microphone-permission dialog for
+**Icy Beauty Latency Capture**. That small ad-hoc-signed foreground app exists
+only so macOS can attribute the NT USB input request to a declared application
+identity. `make hardware-latency-smoke` exercises the same routing, capture,
+analysis, and rollback with one note-on and never submits acceptance evidence.
 
 ## Canonical reference
 

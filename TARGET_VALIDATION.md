@@ -79,8 +79,49 @@ render test also proves that, once the host invokes the plug-in's MIDI callback,
 the maximum-control eight-voice patch produces finite audio in the immediately
 following render block.
 
-The remaining AC-005 check is an end-to-end physical measurement from MIDI
-note-on to Output 1 audio onset on the same supported configuration. It must be
-below 10 ms. Native callback timing and the USB MIDI send time alone do not
-replace this physical measurement. Record the maximum measured latency and the
-measurement setup with the target evidence; a value at or above 10 ms fails.
+The physical latency gate is:
+
+```sh
+make hardware-latency
+```
+
+It requires the existing approved preset to contain exactly eight-voice NsIb
+in slot 0 with Output 1, MIDI Omni, and all five sound controls at 100. The
+harness then performs the following guarded sequence:
+
+1. Add the built-in **USB audio (to host)** algorithm in slot 1.
+2. Route `USB channel 1 from` to the same `Output 1` used by NsIb and set USB
+   channels 2-12 to `None`.
+3. Save and read back the two-slot topology through `nt_helper`, including the
+   routing graph.
+4. Open the exact 12-channel `disting NT` PortAudio input at 48 kHz and select
+   host input 1.
+5. Send eight isolated A4 note-ons at velocity 127 through the exact CoreMIDI
+   destination `disting NT`, allowing the maximum Release tail to become
+   silent between trials.
+6. Bracket every immediate CoreMIDI send with `Pa_GetStreamTime()` and use
+   each callback's `inputBufferAdcTime`. PortAudio defines these values on the
+   same stream clock, so the captured sample and MIDI-send interval can be
+   compared without independent-process launch timing.
+7. Detect onset only after four consecutive physical samples satisfy the
+   signal gate. The reported upper bound starts at the earliest possible MIDI
+   send time, ends after the complete onset-confirmation window, and includes
+   the maximum observed adjacent-block timestamp discontinuity.
+8. Require every trial to have at least 60 dB signal-to-baseline separation,
+   no capture overflow/underflow, and a conservative upper latency below
+   10 ms.
+9. Retain the raw float capture, timing JSON, verified 48 kHz/24-bit mono WAV,
+   hashes, topology, analysis, and the prior 182-check processing report.
+10. In every success, failure, timeout, or interruption path, remove slot 1,
+    save, and compare the preset and all NsIb parameters with the original
+    snapshot before considering the test complete.
+
+macOS attributes audio-input permission to the ad-hoc-signed foreground
+**Icy Beauty Latency Capture** app declared by
+`scripts/latency_capture_Info.plist`. The first run may require approving its
+microphone dialog. The app records only the selected disting NT USB stream.
+
+`make hardware-latency-smoke` runs one physical trial without evidence
+submission. A full passing run submits AC-005 only when all eight latency
+trials pass, the retained maximum processing use is at most 75%, the checkout
+was clean at test start, and the NsIb-only preset was restored exactly.
