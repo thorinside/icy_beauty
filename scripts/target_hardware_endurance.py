@@ -69,26 +69,6 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def parse_utc_timestamp(value: str) -> datetime:
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as error:
-        raise EnduranceError("invalid ISO-8601 session start: %s" % value) from error
-    if parsed.tzinfo is None:
-        raise EnduranceError("existing session start must include a timezone")
-    return parsed.astimezone(timezone.utc)
-
-
-def validated_duration_seconds(report: dict) -> float:
-    observed = report.get("observedSession")
-    if isinstance(observed, dict):
-        elapsed = observed.get("elapsedSeconds")
-        if isinstance(elapsed, (int, float)):
-            return float(elapsed)
-    measured = report.get("midi", {}).get("complete", {}).get("elapsedSeconds")
-    return float(measured) if isinstance(measured, (int, float)) else 0.0
-
-
 def emit_progress(event: str, **fields) -> None:
     payload = {"event": event, "timestamp": utc_now(), **fields}
     with _PRINT_LOCK:
@@ -560,7 +540,7 @@ class MidiWorker:
             self.events.append(event)
             self.event_queue.put(event)
             if event.get("event") in {"midi-minute", "error", "cleanup-error"}:
-                emit_progress("midi-worker", workerEvent=event)
+                emit_progress("midi-worker", **event)
 
     def wait_for_event(self, name: str, timeout: float) -> dict:
         deadline = time.monotonic() + timeout
@@ -773,33 +753,6 @@ def configure_target_preset(client: McpClient) -> dict:
     }
 
 
-def inspect_existing_target_preset(client: McpClient) -> dict:
-    preset = client.call_tool("show_preset", {}, timeout=15.0)
-    valid, reason = validate_preset_summary(preset)
-    if not valid:
-        raise EnduranceError("existing target preset is invalid: %s" % reason)
-    slot = client.call_tool("show_slot", {"slot_index": 0}, timeout=15.0)
-    valid, reason = validate_target_slot(slot)
-    if not valid:
-        raise EnduranceError("existing target slot is invalid: %s" % reason)
-    parameters = {
-        item.get("parameter_name"): item.get("value")
-        for item in slot.get("parameters", [])
-    }
-    return {
-        "created": False,
-        "preset": preset,
-        "slot": slot,
-        "settings": {
-            "voices": 8,
-            "output": "Output 1",
-            "outputMode": str(parameters.get("Output mode", "")).strip(),
-            "midiChannel": "Omni",
-            **SOUND_SETTINGS,
-        },
-    }
-
-
 class ResponsivenessPoller:
     def __init__(self, client: McpClient, interval_seconds: float):
         self.client = client
@@ -898,20 +851,6 @@ class ResponsivenessPoller:
 
 
 def evidence_values(report: dict) -> dict:
-    observed = report.get("observedSession")
-    patch_settings = (
-        "NsIb only in slot 0; Voices 8; Output 1; MIDI Omni; "
-        "Tone 100, Motion 100, Grain 100, Resonance 100, Release 100. "
-        "All approved synthesis features remained enabled at their normal "
-        "implementation quality."
-    )
-    if isinstance(observed, dict):
-        patch_settings = (
-            "NsIb was the only algorithm for the full observed residency interval. "
-            "It began at the four-voice default and was reconfigured for closeout "
-            "to Voices 8; Output 1; MIDI Omni; Tone 100, Motion 100, Grain 100, "
-            "Resonance 100, Release 100. No sound feature was removed."
-        )
     return {
         "testedFirmware": report["midi"]["ready"]["firmware"],
         "hostConfiguration": (
@@ -926,9 +865,16 @@ def evidence_values(report: dict) -> dict:
                 report["contract"]["responsivenessIntervalSeconds"],
             )
         ),
-        "patchSettings": patch_settings,
+        "patchSettings": (
+            "NsIb only in slot 0; Voices 8; Output 1; MIDI Omni; "
+            "Tone 100, Motion 100, Grain 100, Resonance 100, Release 100. "
+            "All approved synthesis features remained enabled at their normal "
+            "implementation quality."
+        ),
         "loadedNormally": True,
-        "uninterruptedMinutes": validated_duration_seconds(report) / 60.0,
+        "uninterruptedMinutes": (
+            report["midi"]["complete"]["elapsedSeconds"] / 60.0
+        ),
         "noCrashes": True,
         "noDropouts": True,
         "noStuckNotes": True,
@@ -940,37 +886,13 @@ def evidence_values(report: dict) -> dict:
 def evidence_notes(report: dict) -> str:
     responsiveness = report["responsiveness"]
     midi = report["midi"]["complete"]
-    observed = report.get("observedSession")
-    if isinstance(observed, dict):
-        return (
-            "Physical target report %s. Tested source commit %s and plugin SHA-256 "
-            "%s. Owner-directed whole-session interval: %s to %s, %.2f minutes "
-            "with NsIb as the sole resident algorithm; %s Final closeout drove %d "
-            "dense-MIDI cycles and completed %d successful nt_helper preset/slot/CPU "
-            "checks with no failures; maximum observed processing use was %.2f%%. "
-            "Same-commit make test endurance inspect passed accelerated continuous-"
-            "audio, finite-sample, and note-cleanup assertions. No USB audio (to "
-            "host) slot was added because the physical preset had to remain NsIb-only."
-            % (
-                report["reportPath"],
-                report["source"]["git"]["commit"],
-                report["source"]["plugin"]["sha256"],
-                observed["startedAt"],
-                observed["endedAt"],
-                observed["elapsedSeconds"] / 60.0,
-                observed["note"],
-                midi["activityCycles"],
-                responsiveness["checkCount"],
-                responsiveness["maximumObservedProcessingUsePercent"],
-            )
-        )
     return (
         "Physical target report %s. Tested source commit %s and plugin SHA-256 %s. "
         "Completed %.2f uninterrupted minutes with %d dense-MIDI activity cycles, "
         "%d successful nt_helper preset/CPU responsiveness checks and no failed "
         "checks; maximum observed processing use was %.2f%%. The physical preset "
         "contained only eight-voice NsIb throughout and passed the final "
-        "post-release check. Same-commit make test endurance inspect preflight also "
+        "post-release check. Same-commit make endurance inspect preflight also "
         "passed, including accelerated continuous-audio, finite-sample, and "
         "note-cleanup assertions. Per the owner-approved boundary, no separate USB "
         "audio (to host) slot was added to the NsIb-only physical preset."
@@ -987,13 +909,21 @@ def evidence_notes(report: dict) -> str:
 
 
 def submit_evidence(report: dict, config_path: Path) -> dict:
+    if report["contract"]["activeSeconds"] < MINIMUM_EVIDENCE_SECONDS:
+        raise EnduranceError(
+            "refusing to submit AC-004 evidence for less than 30 minutes"
+        )
     if not report.get("physicalTestPassed", report.get("passed")):
         raise EnduranceError("refusing to submit evidence from a failed run")
-    measured_seconds = validated_duration_seconds(report)
-    if measured_seconds < MINIMUM_EVIDENCE_SECONDS:
+    measured_seconds = (
+        report.get("midi", {}).get("complete", {}).get("elapsedSeconds")
+    )
+    if (
+        not isinstance(measured_seconds, (int, float))
+        or measured_seconds < MINIMUM_EVIDENCE_SECONDS
+    ):
         raise EnduranceError(
-            "refusing to submit AC-004 evidence for less than 30 minutes of "
-            "measured wall-clock time"
+            "refusing to submit AC-004 evidence without 30 measured wall-clock minutes"
         )
     url, headers = load_substrate_connection(config_path)
     client = McpClient(
@@ -1082,13 +1012,6 @@ def write_report(report_path: Path, report: dict) -> None:
 
 def run_endurance(args) -> tuple[dict, Path]:
     started_at = utc_now()
-    observed_start = (
-        parse_utc_timestamp(args.existing_session_start)
-        if args.existing_session_start
-        else None
-    )
-    if observed_start is not None and observed_start >= datetime.now(timezone.utc):
-        raise EnduranceError("existing session start must be in the past")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_directory = (
         Path(args.run_dir)
@@ -1114,7 +1037,6 @@ def run_endurance(args) -> tuple[dict, Path]:
             "postReleaseSeconds": args.post_release_seconds,
             "activityIntervalSeconds": args.activity_interval_seconds,
             "responsivenessIntervalSeconds": args.responsiveness_interval_seconds,
-            "existingSessionCloseout": observed_start is not None,
             "deploymentPerformed": False,
             "evidenceSubmissionRequested": not args.no_submit_evidence,
         },
@@ -1125,14 +1047,6 @@ def run_endurance(args) -> tuple[dict, Path]:
             "idempotencyKey": str(uuid.uuid4()),
         },
     }
-    if observed_start is not None:
-        report["observedSession"] = {
-            "basis": "owner-directed whole NsIb residency interval",
-            "startedAt": observed_start.isoformat().replace("+00:00", "Z"),
-            "endedAt": None,
-            "elapsedSeconds": 0.0,
-            "note": args.existing_session_note,
-        }
     write_report(report_path, report)
 
     nt_client = None
@@ -1175,11 +1089,7 @@ def run_endurance(args) -> tuple[dict, Path]:
             "protocolVersion": nt_client.protocol_version,
             "serverInfo": nt_client.server_info,
         }
-        report["presetSetup"] = (
-            inspect_existing_target_preset(nt_client)
-            if observed_start is not None
-            else configure_target_preset(nt_client)
-        )
+        report["presetSetup"] = configure_target_preset(nt_client)
         report["checks"]["presetSetup"] = True
 
         midi_python = args.midi_python
@@ -1238,14 +1148,6 @@ def run_endurance(args) -> tuple[dict, Path]:
         poller = None
         report["midi"] = midi_report
         report["responsiveness"] = responsiveness_report
-        if observed_start is not None:
-            observed_end = datetime.now(timezone.utc)
-            report["observedSession"]["endedAt"] = (
-                observed_end.isoformat().replace("+00:00", "Z")
-            )
-            report["observedSession"]["elapsedSeconds"] = (
-                observed_end - observed_start
-            ).total_seconds()
     except KeyboardInterrupt:
         report["failure"] = {"message": "test interrupted"}
     except Exception as error:  # noqa: BLE001 - persist every physical failure
@@ -1317,18 +1219,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--nt-mcp-url", default="http://127.0.0.1:3847/mcp")
     parser.add_argument("--substrate-config", default="~/.codex/config.toml")
     parser.add_argument("--midi-python", default=DEFAULT_MIDI_PYTHON)
-    parser.add_argument(
-        "--existing-session-start",
-        help=(
-            "ISO-8601 start of an already-running owner-approved NsIb session; "
-            "validates the current preset without recreating it"
-        ),
-    )
-    parser.add_argument(
-        "--existing-session-note",
-        default="",
-        help="durable explanation of the existing-session start and transitions",
-    )
     parser.add_argument("--no-submit-evidence", action="store_true")
     parser.add_argument("--submit-existing-report")
     parser.add_argument("--midi-worker", action="store_true", help=argparse.SUPPRESS)
@@ -1344,8 +1234,6 @@ def main(argv=None) -> int:
         parser.error("activity interval must be positive")
     if args.responsiveness_interval_seconds <= 0:
         parser.error("responsiveness interval must be positive")
-    if args.existing_session_start and not args.existing_session_note.strip():
-        parser.error("--existing-session-note is required with --existing-session-start")
     if args.midi_worker:
         return midi_worker_main(args)
     try:
