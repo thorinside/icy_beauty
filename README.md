@@ -12,10 +12,11 @@ Presets use the disting NT host's standard mechanism. **Voices** is restored as 
 
 This remains an incremental delivery. The approved 30-minute target-hardware
 endurance run has passed, including a 29% maximum observed processing load.
-The repeatable physical MIDI-note-on latency harness is also implemented; it
-temporarily routes Output 1 through the built-in USB audio (to host) algorithm,
-captures host input 1, and restores the approved NsIb-only preset after the
-test. Owner listening acceptance remains separate.
+The physical MIDI-note-on latency gate also passed eight captured trials with
+a 1.329 ms maximum conservative bound. The harness temporarily routed Output 1
+through the built-in USB audio (to host) algorithm, captured host input 1, and
+restored the approved NsIb-only preset exactly. Owner listening acceptance
+remains separate.
 
 ## Build
 

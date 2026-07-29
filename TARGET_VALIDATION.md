@@ -125,3 +125,26 @@ microphone dialog. The app records only the selected disting NT USB stream.
 submission. A full passing run submits AC-005 only when all eight latency
 trials pass, the retained maximum processing use is at most 75%, the checkout
 was clean at test start, and the NsIb-only preset was restored exactly.
+
+### Retained AC-005 pass record
+
+The evidence-grade run retained at
+`verification/hardware-runs/icy-beauty-latency-20260729T221816Z/target-midi-latency.json`
+passed against clean commit `8f846d5`. All eight physical note-ons passed with
+conservative upper bounds of 1.176, 1.066, 1.038, 1.328, 1.120, 1.177, 0.763,
+and 0.980 ms. The recorded maximum is 1.329 ms after upward rounding, safely
+below the 10 ms limit. The largest captured block-timestamp discontinuity,
+included in every bound, was 0.026 ms.
+
+The capture contained 3,678,208 samples over 76.629 seconds with no PortAudio
+status flags, null input, or capacity overrun. The verified 48 kHz, 24-bit PCM
+mono WAV has SHA-256
+`23a83b8a917f0128b466f9bcff7f119047627a6e89fedd2bdf3c33637255fbb1`.
+The timing JSON has SHA-256
+`17081997628c6525d3276d603185f6520b992a04ba1a25d7540e3e6aa63bc699`.
+
+The two-slot routing graph showed NsIb Output 1 feeding only USB host channel
+1. After capture, slot 1 was removed and every original NsIb parameter was
+compared with the starting snapshot; exact restoration passed. Combined with
+the retained 182-check, 30-minute processing maximum of 29%, this evidence was
+accepted by the Portal tracker and changed AC-005 to `met`.
