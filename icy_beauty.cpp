@@ -44,6 +44,7 @@ struct Voice {
     float resonatorBand;
     uint8_t note;
     uint8_t channel;
+    uint8_t polyAftertouch;
     uint8_t source;
     bool gate;
     bool keyHeld;
@@ -54,6 +55,7 @@ struct IcyBeautyDtc {
     float pitchBendScale[16];
     uint32_t nextAge;
     uint8_t modWheel[16];
+    uint8_t channelPressure[16];
     bool sustainPedal[16];
     bool cvGateHigh;
 };
@@ -233,6 +235,7 @@ void clearVoice(Voice& voice) {
     voice.resonatorBand = 0.0f;
     voice.note = 0;
     voice.channel = 0;
+    voice.polyAftertouch = 0;
     voice.source = kVoiceUnused;
     voice.gate = false;
     voice.keyHeld = false;
@@ -250,10 +253,12 @@ _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& memory,
     for (int voice = 0; voice < kMaxVoices; ++voice)
         clearVoice(dtc->voices[voice]);
     volatile uint8_t* const modWheel = dtc->modWheel;
+    volatile uint8_t* const channelPressure = dtc->channelPressure;
     volatile bool* const sustainPedal = dtc->sustainPedal;
     for (int channel = 0; channel < 16; ++channel) {
         dtc->pitchBendScale[channel] = 1.0f;
         modWheel[channel] = 0;
+        channelPressure[channel] = 0;
         sustainPedal[channel] = false;
     }
     dtc->nextAge = 0;
@@ -327,6 +332,7 @@ void startVoice(IcyBeautyDtc* dtc, Voice& voice, uint8_t source,
     voice.resonatorBand = 0.0f;
     voice.note = note;
     voice.channel = channel;
+    voice.polyAftertouch = 0;
     voice.source = source;
     voice.gate = true;
     voice.keyHeld = source == kVoiceMidi;
@@ -404,6 +410,33 @@ void setSustainPedal(IcyBeautyAlgorithm* algorithm, uint8_t channel,
     }
 }
 
+void setPolyAftertouch(IcyBeautyAlgorithm* algorithm, uint8_t channel,
+                       uint8_t note, uint8_t pressure) {
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        Voice& voice = algorithm->dtc->voices[index];
+        if (voice.source == kVoiceMidi && voice.channel == channel &&
+            voice.note == note) {
+            voice.polyAftertouch = pressure;
+        }
+    }
+}
+
+float aftertouchAmount(const IcyBeautyDtc* dtc, const Voice& voice) {
+    const uint8_t channelPressure = dtc->channelPressure[voice.channel];
+    const uint8_t pressure = voice.polyAftertouch > channelPressure
+                                 ? voice.polyAftertouch
+                                 : channelPressure;
+    return pressure * (1.0f / 127.0f);
+}
+
+float resonanceWithAftertouch(float resonance, float pressure) {
+    return resonance + (1.0f - resonance) * pressure;
+}
+
+float motionWithAftertouch(float motion, float pressure) {
+    return motion + (1.0f - motion) * (0.35f * pressure);
+}
+
 void midiMessage(_NT_algorithm* self, uint8_t status, uint8_t data1,
                  uint8_t data2) {
     IcyBeautyAlgorithm* algorithm = static_cast<IcyBeautyAlgorithm*>(self);
@@ -428,11 +461,16 @@ void midiMessage(_NT_algorithm* self, uint8_t status, uint8_t data1,
                     voice.gate = false;
             }
         }
+    } else if (message == 0xa0U) {
+        setPolyAftertouch(algorithm, channel, data1,
+                          data2 & 0x7fU);
     } else if (message == 0xb0U) {
         if (data1 == 1U)
             algorithm->dtc->modWheel[channel] = data2 & 0x7fU;
         else if (data1 == 64U)
             setSustainPedal(algorithm, channel, data2 >= 64U);
+    } else if (message == 0xd0U) {
+        algorithm->dtc->channelPressure[channel] = data1 & 0x7fU;
     } else if (message == 0xe0U) {
         const uint16_t bend = static_cast<uint16_t>(data1 & 0x7fU) |
                               (static_cast<uint16_t>(data2 & 0x7fU) << 7);
@@ -513,8 +551,9 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
     const float releaseSeconds = 0.08f * exp2f(6.64385619f * release);
     const float releaseRate =
         13.815510558f / (sampleRate * releaseSeconds);
-    const float resonatorDamping = 1.3f - 0.95f * resonance;
+    float resonanceAmount[kMaxVoices];
     float resonatorCoefficient[kMaxVoices];
+    float resonatorDamping[kMaxVoices];
     float motionDepth[kMaxVoices];
     uint32_t motionIncrement[kMaxVoices];
     for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
@@ -528,11 +567,19 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         resonatorCoefficient[index] = coefficient;
 
         float effectiveMotion = motion;
+        float effectiveResonance = resonance;
         if (voice.source == kVoiceMidi) {
+            const float pressure = aftertouchAmount(dtc, voice);
+            effectiveMotion = motionWithAftertouch(effectiveMotion,
+                                                   pressure);
+            effectiveResonance = resonanceWithAftertouch(
+                effectiveResonance, pressure);
             const float wheel =
                 dtc->modWheel[voice.channel] * (1.0f / 127.0f);
             effectiveMotion += (1.0f - effectiveMotion) * wheel;
         }
+        resonanceAmount[index] = effectiveResonance;
+        resonatorDamping[index] = 1.3f - 0.95f * effectiveResonance;
         motionDepth[index] = effectiveMotion * 0.0075f;
         motionIncrement[index] = phaseIncrementForFrequency(
             0.08f + 0.92f * effectiveMotion);
@@ -590,12 +637,13 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
                 resonatorCoefficient[index] * voice.resonatorBand;
             const float resonatorHigh =
                 voice.toneState - voice.resonatorLow -
-                resonatorDamping * voice.resonatorBand;
+                resonatorDamping[index] * voice.resonatorBand;
             voice.resonatorBand +=
                 resonatorCoefficient[index] * resonatorHigh;
             const float signal =
-                (1.0f - 0.2f * resonance) * voice.toneState +
-                0.35f * resonance * voice.resonatorBand;
+                (1.0f - 0.2f * resonanceAmount[index]) *
+                    voice.toneState +
+                0.35f * resonanceAmount[index] * voice.resonatorBand;
             mixed += voice.velocity * voice.envelope * signal;
 
             if (!voice.gate && voice.envelope < 0.000001f)

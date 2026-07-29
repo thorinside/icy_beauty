@@ -374,6 +374,49 @@ double midiWheelMotionExcursion(const _NT_factory* factory,
     return static_cast<double>(maximumDelta - minimumDelta);
 }
 
+struct AftertouchRender {
+    std::vector<float> audio;
+    double motionExcursion;
+};
+
+AftertouchRender renderAftertouch(const _NT_factory* factory,
+                                  bool polyphonic, uint8_t pressure) {
+    const int frames = 64;
+    const int totalBlocks = 1500;
+    HostInstance host(factory, 1);
+    host.values[kParamOutputMode] = 1;
+    host.values[host.synth()->soundParameter(kSoundMotion)] = 0;
+    host.values[host.synth()->soundParameter(kSoundGrain)] = 0;
+    host.values[host.synth()->soundParameter(kSoundResonance)] = 0;
+    factory->midiMessage(host.algorithm, 0x96, 57, 100);
+    if (polyphonic)
+        factory->midiMessage(host.algorithm, 0xa6, 57, pressure);
+    else
+        factory->midiMessage(host.algorithm, 0xd6, pressure, 0);
+
+    std::vector<float> busses(kNT_lastBus * frames, 0.0f);
+    AftertouchRender rendered;
+    rendered.audio.reserve(totalBlocks * frames);
+    uint32_t minimumDelta = 0xffffffffU;
+    uint32_t maximumDelta = 0;
+    for (int block = 0; block < totalBlocks; ++block) {
+        std::fill(busses.begin(), busses.end(), 0.0f);
+        const uint32_t phaseBefore =
+            host.synth()->dtc->voices[0].fundamentalPhase;
+        factory->step(host.algorithm, busses.data(), frames / 4);
+        const uint32_t phaseDelta =
+            host.synth()->dtc->voices[0].fundamentalPhase - phaseBefore;
+        minimumDelta = std::min(minimumDelta, phaseDelta);
+        maximumDelta = std::max(maximumDelta, phaseDelta);
+        const float* output = busses.data() + 12 * frames;
+        rendered.audio.insert(rendered.audio.end(), output,
+                              output + frames);
+    }
+    rendered.motionExcursion =
+        static_cast<double>(maximumDelta - minimumDelta);
+    return rendered;
+}
+
 void sendInitialEnduranceChord(const _NT_factory* factory,
                                _NT_algorithm* algorithm,
                                uint8_t notes[kMaxVoices]) {
@@ -713,6 +756,86 @@ int main(int argc, char** argv) {
         "holds and releases keys conventionally\n",
         velocityLoudnessRatio, velocityBrightnessRatio,
         bendDown / bendCenter, bendUp / bendCenter, wheelHighMotion);
+
+    const AftertouchRender polyPressureLow =
+        renderAftertouch(factory, true, 0);
+    const AftertouchRender polyPressureHigh =
+        renderAftertouch(factory, true, 127);
+    if (!isFiniteAndAudible(polyPressureLow.audio) ||
+        !isFiniteAndAudible(polyPressureHigh.audio))
+        return fail("polyphonic aftertouch produced silent or non-finite audio");
+    const double lowPressureResonanceRatio =
+        componentMagnitude(polyPressureLow.audio, 440.0) /
+        componentMagnitude(polyPressureLow.audio, 220.0);
+    const double highPressureResonanceRatio =
+        componentMagnitude(polyPressureHigh.audio, 440.0) /
+        componentMagnitude(polyPressureHigh.audio, 220.0);
+    const double aftertouchMotionThreshold =
+        phaseIncrementForNote(57) * 64.0 * 0.003;
+    if (highPressureResonanceRatio < lowPressureResonanceRatio * 1.25)
+        return fail("aftertouch did not audibly increase Resonance");
+    if (polyPressureLow.motionExcursion > 1.0 ||
+        polyPressureHigh.motionExcursion < aftertouchMotionThreshold)
+        return fail("aftertouch did not audibly increase Motion");
+
+    HostInstance polyPressure(factory, 2);
+    polyPressure.values[polyPressure.synth()->soundParameter(kSoundMotion)] = 0;
+    polyPressure.values[
+        polyPressure.synth()->soundParameter(kSoundResonance)] = 0;
+    factory->midiMessage(polyPressure.algorithm, 0x98, 57, 100);
+    factory->midiMessage(polyPressure.algorithm, 0x98, 64, 100);
+    factory->midiMessage(polyPressure.algorithm, 0xa8, 57, 127);
+    const Voice* pressedNote = findMidiVoice(polyPressure.synth(), 8, 57);
+    const Voice* unpressedNote = findMidiVoice(polyPressure.synth(), 8, 64);
+    if (pressedNote == NULL || unpressedNote == NULL ||
+        aftertouchAmount(polyPressure.synth()->dtc, *pressedNote) < 0.99f ||
+        aftertouchAmount(polyPressure.synth()->dtc, *unpressedNote) != 0.0f)
+        return fail("polyphonic aftertouch did not remain note-independent");
+    const float resonanceLift =
+        resonanceWithAftertouch(0.5f, 1.0f) - 0.5f;
+    const float motionLift =
+        motionWithAftertouch(0.5f, 1.0f) - 0.5f;
+    if (resonanceLift <= motionLift)
+        return fail("aftertouch Motion mapping was not weaker than Resonance");
+
+    HostInstance channelPressure(factory, 2);
+    factory->midiMessage(channelPressure.algorithm, 0x9a, 57, 100);
+    factory->midiMessage(channelPressure.algorithm, 0x9a, 64, 100);
+    factory->midiMessage(channelPressure.algorithm, 0xda, 127, 0);
+    const Voice* firstChannelNote =
+        findMidiVoice(channelPressure.synth(), 10, 57);
+    const Voice* secondChannelNote =
+        findMidiVoice(channelPressure.synth(), 10, 64);
+    if (firstChannelNote == NULL || secondChannelNote == NULL ||
+        aftertouchAmount(channelPressure.synth()->dtc,
+                         *firstChannelNote) < 0.99f ||
+        aftertouchAmount(channelPressure.synth()->dtc,
+                         *secondChannelNote) < 0.99f)
+        return fail("channel pressure did not apply across the held chord");
+    const AftertouchRender channelPressureLow =
+        renderAftertouch(factory, false, 0);
+    const AftertouchRender channelPressureHigh =
+        renderAftertouch(factory, false, 127);
+    if (!isFiniteAndAudible(channelPressureLow.audio) ||
+        !isFiniteAndAudible(channelPressureHigh.audio))
+        return fail("channel pressure produced silent or non-finite audio");
+    const double lowChannelResonanceRatio =
+        componentMagnitude(channelPressureLow.audio, 440.0) /
+        componentMagnitude(channelPressureLow.audio, 220.0);
+    const double highChannelResonanceRatio =
+        componentMagnitude(channelPressureHigh.audio, 440.0) /
+        componentMagnitude(channelPressureHigh.audio, 220.0);
+    if (highChannelResonanceRatio < lowChannelResonanceRatio * 1.25 ||
+        channelPressureLow.motionExcursion > 1.0 ||
+        channelPressureHigh.motionExcursion < aftertouchMotionThreshold)
+        return fail("channel pressure did not apply the aftertouch mapping");
+
+    std::printf(
+        "PASS: aftertouch: Resonance %.2fx stronger harmonic, polyphonic "
+        "pressure remains per-note, channel pressure spans the chord, and "
+        "Motion rises by the smaller %.2f normalized amount\n",
+        highPressureResonanceRatio / lowPressureResonanceRatio,
+        motionLift);
 
     factory->midiMessage(midi.algorithm, 0x99, 69, 112);
 
