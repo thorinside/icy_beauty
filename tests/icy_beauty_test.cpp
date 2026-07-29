@@ -649,7 +649,77 @@ int main(int argc, char** argv) {
         midi.values[midi.synth()->soundParameter(kSoundGrain)] != 50 ||
         midi.values[midi.synth()->soundParameter(kSoundResonance)] != 50 ||
         midi.values[midi.synth()->soundParameter(kSoundRelease)] != 65)
-        return fail("fresh-load sound controls are not centered with a long release");
+        return fail("fresh-load sound controls are not centered with a medium-long release");
+
+    {
+        const int freshFrames = 64;
+        HostInstance freshLoad(factory, 4);
+        if (freshLoad.values[kParamOutput] != 13 ||
+            freshLoad.values[kParamMidiChannel] != 0)
+            return fail("fresh-load routing or MIDI defaults changed");
+
+        static const uint8_t kFreshNotes[] = {57, 64, 69};
+        for (std::size_t index = 0; index < sizeof(kFreshNotes); ++index)
+            factory->midiMessage(freshLoad.algorithm, 0x99,
+                                 kFreshNotes[index], 100);
+
+        std::vector<float> freshBusses(
+            kNT_lastBus * freshFrames, 0.0f);
+        float freshPeak = 0.0f;
+        uint32_t minimumPhaseDelta = 0xffffffffU;
+        uint32_t maximumPhaseDelta = 0;
+        const int soundingBlocks = NT_globals.sampleRate / freshFrames;
+        for (int block = 0; block < soundingBlocks; ++block) {
+            std::fill(freshBusses.begin(), freshBusses.end(), 0.0f);
+            const uint32_t phaseBefore =
+                freshLoad.synth()->dtc->voices[0].fundamentalPhase;
+            factory->step(freshLoad.algorithm, freshBusses.data(),
+                          freshFrames / 4);
+            const uint32_t phaseDelta =
+                freshLoad.synth()->dtc->voices[0].fundamentalPhase -
+                phaseBefore;
+            minimumPhaseDelta = std::min(minimumPhaseDelta, phaseDelta);
+            maximumPhaseDelta = std::max(maximumPhaseDelta, phaseDelta);
+            const float* output1 =
+                freshBusses.data() + 12 * freshFrames;
+            for (int frame = 0; frame < freshFrames; ++frame) {
+                if (!std::isfinite(output1[frame]))
+                    return fail("fresh-load patch produced non-finite audio");
+                freshPeak = std::max(freshPeak, std::fabs(output1[frame]));
+            }
+        }
+        if (freshPeak < 0.1f || maximumPhaseDelta == minimumPhaseDelta)
+            return fail("fresh-load patch was not audible and animated");
+
+        for (std::size_t index = 0; index < sizeof(kFreshNotes); ++index)
+            factory->midiMessage(freshLoad.algorithm, 0x89,
+                                 kFreshNotes[index], 0);
+        const int releaseBlocks = NT_globals.sampleRate / (4 * freshFrames);
+        float endingTailPeak = 0.0f;
+        for (int block = 0; block < releaseBlocks; ++block) {
+            std::fill(freshBusses.begin(), freshBusses.end(), 0.0f);
+            factory->step(freshLoad.algorithm, freshBusses.data(),
+                          freshFrames / 4);
+            if (block + 8 < releaseBlocks)
+                continue;
+            const float* output1 =
+                freshBusses.data() + 12 * freshFrames;
+            for (int frame = 0; frame < freshFrames; ++frame) {
+                if (!std::isfinite(output1[frame]))
+                    return fail("fresh-load release produced non-finite audio");
+                endingTailPeak = std::max(endingTailPeak,
+                                          std::fabs(output1[frame]));
+            }
+        }
+        if (endingTailPeak < 0.001f)
+            return fail("fresh-load release did not sustain an audible tail");
+
+        std::printf(
+            "PASS: fresh load renders centered icy controls through Output 1 "
+            "from Omni MIDI with animated audio and a %.3f tail peak after "
+            "250 ms of release\n",
+            endingTailPeak);
+    }
 
     for (int control = 0; control < kNumSoundParameters; ++control) {
         const double difference = renderSoundControlDifference(
