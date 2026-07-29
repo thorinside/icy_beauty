@@ -1,10 +1,12 @@
 # Icy Beauty
 
-Icy Beauty is a focused software synthesizer plug-in for the Expert Sleepers disting NT. It exposes a disting NT API factory, listens in MIDI Omni mode, renders an icy dual-triangle voice, and routes audio to Output 1 by default. The **Voices** specification configures one to eight shared voices (four by default) for both MIDI and polyphonic CV/gate playing.
+Icy Beauty is a focused software synthesizer plug-in for the Expert Sleepers disting NT. It exposes one curated, fixed signal path built from paired triangle oscillators, animated tuning, noise instability, tone shaping, and a tuned resonator. It listens in MIDI Omni mode and routes audio to Output 1 by default. The **Voices** specification configures one to eight shared voices (four by default) for both MIDI and polyphonic CV/gate playing.
+
+The deliberately small sound surface contains exactly five host-mappable controls: **Tone** moves from dark toward glassy harmonics, **Motion** adds animated instability, **Grain** introduces noisy pitch texture, **Resonance** strengthens tuned ringing, and **Release** ranges from short decays to haunting tails. There are no selectable synthesis engines or general-purpose routing matrix.
 
 CV/gate control exposes one shared **Gate** input followed by one **Pitch** CV input per configured voice. The defaults follow the disting NT sequential-input convention: Gate uses Input 1, and Pitch 1 onward use Input 2 onward. A rising gate triggers the configured pitches together; a falling gate releases them. When MIDI and CV contend for the shared voice pool, held MIDI notes take priority: MIDI may replace a CV voice, while a CV gate retrigger preserves held MIDI notes.
 
-This is an early delivery slice, not the complete approved instrument. The five final sound controls, expressive MIDI mappings, and target-hardware performance/listening acceptance remain future work.
+This remains an incremental delivery. Expressive MIDI mappings and target-hardware performance/listening acceptance are future work.
 
 ## Build
 

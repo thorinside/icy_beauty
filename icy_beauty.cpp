@@ -10,7 +10,9 @@ enum {
     kMaxVoices = 8,
     kDefaultVoices = 4,
     kNumCommonParameters = 3,
-    kMaxParameters = kNumCommonParameters + 1 + kMaxVoices,
+    kNumSoundParameters = 5,
+    kMaxParameters =
+        kNumCommonParameters + 1 + kMaxVoices + kNumSoundParameters,
 };
 
 enum VoiceSource {
@@ -19,13 +21,26 @@ enum VoiceSource {
     kVoiceCv,
 };
 
+enum SoundParameter {
+    kSoundTone,
+    kSoundMotion,
+    kSoundGrain,
+    kSoundResonance,
+    kSoundRelease,
+};
+
 struct Voice {
     uint32_t fundamentalPhase;
     uint32_t glassPhase;
+    uint32_t motionPhase;
     uint32_t phaseIncrement;
+    uint32_t noiseState;
     uint32_t age;
     float envelope;
     float velocity;
+    float toneState;
+    float resonatorLow;
+    float resonatorBand;
     uint8_t note;
     uint8_t source;
     bool gate;
@@ -61,6 +76,19 @@ static const _NT_parameter kCommonParameters[] = {
       .unit = kNT_unitEnum, .scaling = 0, .enumStrings = kMidiChannels },
 };
 
+static const _NT_parameter kSoundParameters[kNumSoundParameters] = {
+    { .name = "Tone", .min = 0, .max = 100, .def = 50,
+      .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Motion", .min = 0, .max = 100, .def = 50,
+      .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Grain", .min = 0, .max = 100, .def = 50,
+      .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Resonance", .min = 0, .max = 100, .def = 50,
+      .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+    { .name = "Release", .min = 0, .max = 100, .def = 65,
+      .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
+};
+
 struct IcyBeautyAlgorithm : public _NT_algorithm {
     IcyBeautyAlgorithm(IcyBeautyDtc* dtcMemory, uint8_t configuredVoices)
         : dtc(dtcMemory), voiceCount(configuredVoices) {
@@ -80,6 +108,21 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
                        kPitchNames[voice], voice + 2);
         }
 
+        soundParameterFirst = kParamPitchFirst + voiceCount;
+        for (uint8_t control = 0; control < kNumSoundParameters; ++control) {
+            const _NT_parameter& source = kSoundParameters[control];
+            _NT_parameter& destination =
+                parameterDefs[soundParameterFirst + control];
+            destination.name = source.name;
+            destination.min = source.min;
+            destination.max = source.max;
+            destination.def = source.def;
+            destination.unit = source.unit;
+            destination.scaling = source.scaling;
+            destination.enumStrings = source.enumStrings;
+            soundPageParams[control] = soundParameterFirst + control;
+        }
+
         setupPageParams[0] = kParamMidiChannel;
         cvPageParams[0] = kParamGate;
         for (uint8_t voice = 0; voice < voiceCount; ++voice)
@@ -88,9 +131,11 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
         routingPageParams[1] = kParamOutputMode;
 
         setPage(pageDefs[0], "Setup", setupPageParams, 1);
-        setPage(pageDefs[1], "CV/Gate", cvPageParams, voiceCount + 1);
-        setPage(pageDefs[2], "Routing", routingPageParams, 2);
-        pagesDef.numPages = 3;
+        setPage(pageDefs[1], "Sound", soundPageParams,
+                kNumSoundParameters);
+        setPage(pageDefs[2], "CV/Gate", cvPageParams, voiceCount + 1);
+        setPage(pageDefs[3], "Routing", routingPageParams, 2);
+        pagesDef.numPages = 4;
         pagesDef.pages = pageDefs;
 
         parameters = parameterDefs;
@@ -119,12 +164,22 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
         page.params = pageParameters;
     }
 
+    int soundParameter(SoundParameter control) const {
+        return soundParameterFirst + static_cast<int>(control);
+    }
+
+    float soundValue(SoundParameter control) const {
+        return v[soundParameter(control)] * 0.01f;
+    }
+
     IcyBeautyDtc* dtc;
     uint8_t voiceCount;
+    uint8_t soundParameterFirst;
     _NT_parameter parameterDefs[kMaxParameters];
     _NT_parameterPages pagesDef;
-    _NT_parameterPage pageDefs[3];
+    _NT_parameterPage pageDefs[4];
     uint8_t setupPageParams[1];
+    uint8_t soundPageParams[kNumSoundParameters];
     uint8_t cvPageParams[1 + kMaxVoices];
     uint8_t routingPageParams[2];
 };
@@ -149,7 +204,8 @@ void calculateRequirements(_NT_algorithmRequirements& requirements,
                            const int32_t* specifications) {
     const uint8_t voiceCount =
         voiceCountFromSpecifications(specifications);
-    requirements.numParameters = kNumCommonParameters + 1 + voiceCount;
+    requirements.numParameters =
+        kNumCommonParameters + 1 + voiceCount + kNumSoundParameters;
     requirements.sram = sizeof(IcyBeautyAlgorithm);
     requirements.dram = 0;
     requirements.dtc = sizeof(IcyBeautyDtc);
@@ -159,10 +215,15 @@ void calculateRequirements(_NT_algorithmRequirements& requirements,
 void clearVoice(Voice& voice) {
     voice.fundamentalPhase = 0;
     voice.glassPhase = 0x40000000U;
+    voice.motionPhase = 0;
     voice.phaseIncrement = 0;
+    voice.noiseState = 1;
     voice.age = 0;
     voice.envelope = 0.0f;
     voice.velocity = 0.0f;
+    voice.toneState = 0.0f;
+    voice.resonatorLow = 0.0f;
+    voice.resonatorBand = 0.0f;
     voice.note = 0;
     voice.source = kVoiceUnused;
     voice.gate = false;
@@ -225,8 +286,15 @@ void startVoice(IcyBeautyDtc* dtc, Voice& voice, uint8_t source,
     voice.glassPhase = 0x40000000U;
     voice.phaseIncrement = phaseIncrement;
     voice.age = ++dtc->nextAge;
+    voice.motionPhase = 0x9e3779b9U * voice.age;
+    voice.noiseState = 0x6d2b79f5U ^ (voice.age * 0x85ebca6bU) ^ note;
+    if (voice.noiseState == 0)
+        voice.noiseState = 1;
     voice.envelope = 0.0f;
     voice.velocity = velocity;
+    voice.toneState = 0.0f;
+    voice.resonatorLow = 0.0f;
+    voice.resonatorBand = 0.0f;
     voice.note = note;
     voice.source = source;
     voice.gate = true;
@@ -288,6 +356,15 @@ float triangle(uint32_t phase) {
     return 1.0f - 2.0f * fabsf(saw);
 }
 
+float nextNoise(Voice& voice) {
+    uint32_t state = voice.noiseState;
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    voice.noiseState = state;
+    return static_cast<float>(state >> 8) * (1.0f / 8388608.0f) - 1.0f;
+}
+
 void releaseCvVoices(IcyBeautyAlgorithm* algorithm) {
     for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
         Voice& voice = algorithm->dtc->voices[index];
@@ -329,6 +406,36 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         }
     }
 
+    const float tone = algorithm->soundValue(kSoundTone);
+    const float motion = algorithm->soundValue(kSoundMotion);
+    const float grain = algorithm->soundValue(kSoundGrain);
+    const float resonance = algorithm->soundValue(kSoundResonance);
+    const float release = algorithm->soundValue(kSoundRelease);
+    const float sampleRate = NT_globals.sampleRate == 0
+                                 ? 48000.0f
+                                 : static_cast<float>(NT_globals.sampleRate);
+    const float toneCoefficient = 0.025f + 0.55f * tone * tone;
+    const float fundamentalLevel = 0.82f - 0.28f * tone;
+    const float glassLevel = 0.18f + 0.28f * tone;
+    const float motionDepth = motion * 0.0075f;
+    const float grainDepth = grain * grain;
+    const uint32_t motionIncrement =
+        phaseIncrementForFrequency(0.08f + 0.92f * motion);
+    const float releaseSeconds = 0.08f * exp2f(6.64385619f * release);
+    const float releaseRate =
+        13.815510558f / (sampleRate * releaseSeconds);
+    const float resonatorDamping = 1.3f - 0.95f * resonance;
+    float resonatorCoefficient[kMaxVoices];
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+        const float cyclesPerSample =
+            dtc->voices[index].phaseIncrement * (1.0f / 4294967296.0f);
+        float coefficient =
+            6.0f * cyclesPerSample * (2.01f + 0.7f * tone);
+        if (coefficient > 0.55f)
+            coefficient = 0.55f;
+        resonatorCoefficient[index] = coefficient;
+    }
+
     static const float kVoiceGain[kMaxVoices] = {
         3.5f, 2.47f, 2.02f, 1.75f, 1.56f, 1.43f, 1.32f, 1.24f,
     };
@@ -345,17 +452,42 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
         float mixed = 0.0f;
         for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
             Voice& voice = dtc->voices[index];
-            voice.fundamentalPhase += voice.phaseIncrement;
-            voice.glassPhase += voice.phaseIncrement * 2U +
-                                voice.phaseIncrement / 127U;
+            voice.motionPhase += motionIncrement;
+            const float motionSignal = triangle(voice.motionPhase);
+            const float noise = nextNoise(voice);
+            float frequencyScale =
+                1.0f + motionDepth * motionSignal +
+                0.0015f * grainDepth * noise;
+            if (frequencyScale < 0.98f)
+                frequencyScale = 0.98f;
+            if (frequencyScale > 1.02f)
+                frequencyScale = 1.02f;
+            const uint32_t modulatedIncrement = static_cast<uint32_t>(
+                voice.phaseIncrement * frequencyScale);
+            voice.fundamentalPhase += modulatedIncrement;
+            voice.glassPhase += modulatedIncrement * 2U +
+                                modulatedIncrement / 127U;
 
             const float target = voice.gate ? 1.0f : 0.0f;
-            const float envelopeRate = voice.gate ? 0.0045f : 0.00018f;
+            const float envelopeRate = voice.gate ? 0.0045f : releaseRate;
             voice.envelope += envelopeRate * (target - voice.envelope);
 
+            const float raw =
+                fundamentalLevel * triangle(voice.fundamentalPhase) +
+                glassLevel * triangle(voice.glassPhase) +
+                0.14f * grainDepth * noise;
+            voice.toneState += toneCoefficient * (raw - voice.toneState);
+
+            voice.resonatorLow +=
+                resonatorCoefficient[index] * voice.resonatorBand;
+            const float resonatorHigh =
+                voice.toneState - voice.resonatorLow -
+                resonatorDamping * voice.resonatorBand;
+            voice.resonatorBand +=
+                resonatorCoefficient[index] * resonatorHigh;
             const float signal =
-                0.72f * triangle(voice.fundamentalPhase) +
-                0.28f * triangle(voice.glassPhase);
+                (1.0f - 0.2f * resonance) * voice.toneState +
+                0.35f * resonance * voice.resonatorBand;
             mixed += voice.velocity * voice.envelope * signal;
 
             if (!voice.gate && voice.envelope < 0.000001f)

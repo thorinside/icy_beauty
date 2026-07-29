@@ -110,6 +110,49 @@ void makeEnduranceChord(uint32_t generation, uint8_t notes[kMaxVoices]) {
         notes[index] = root + kIntervals[index];
 }
 
+double renderSoundControlDifference(const _NT_factory* factory,
+                                    SoundParameter control) {
+    const int frames = 64;
+    HostInstance low(factory, 4);
+    HostInstance high(factory, 4);
+    low.values[kParamOutputMode] = 1;
+    high.values[kParamOutputMode] = 1;
+    low.values[low.synth()->soundParameter(control)] = 0;
+    high.values[high.synth()->soundParameter(control)] = 100;
+
+    static const uint8_t kNotes[] = {57, 64, 69};
+    for (std::size_t index = 0; index < sizeof(kNotes); ++index) {
+        factory->midiMessage(low.algorithm, 0x90, kNotes[index], 100);
+        factory->midiMessage(high.algorithm, 0x90, kNotes[index], 100);
+    }
+
+    std::vector<float> lowBusses(kNT_lastBus * frames, 0.0f);
+    std::vector<float> highBusses(kNT_lastBus * frames, 0.0f);
+    const int totalBlocks = control == kSoundRelease ? 320 : 192;
+    double difference = 0.0;
+    for (int block = 0; block < totalBlocks; ++block) {
+        if (control == kSoundRelease && block == 48) {
+            for (std::size_t index = 0; index < sizeof(kNotes); ++index) {
+                factory->midiMessage(low.algorithm, 0x80, kNotes[index], 0);
+                factory->midiMessage(high.algorithm, 0x80, kNotes[index], 0);
+            }
+        }
+        std::fill(lowBusses.begin(), lowBusses.end(), 0.0f);
+        std::fill(highBusses.begin(), highBusses.end(), 0.0f);
+        factory->step(low.algorithm, lowBusses.data(), frames / 4);
+        factory->step(high.algorithm, highBusses.data(), frames / 4);
+        const float* lowOutput = lowBusses.data() + 12 * frames;
+        const float* highOutput = highBusses.data() + 12 * frames;
+        for (int frame = 0; frame < frames; ++frame) {
+            if (!std::isfinite(lowOutput[frame]) ||
+                !std::isfinite(highOutput[frame]))
+                return -1.0;
+            difference += std::fabs(lowOutput[frame] - highOutput[frame]);
+        }
+    }
+    return difference / (totalBlocks * frames);
+}
+
 void sendInitialEnduranceChord(const _NT_factory* factory,
                                _NT_algorithm* algorithm,
                                uint8_t notes[kMaxVoices]) {
@@ -255,10 +298,10 @@ int main(int argc, char** argv) {
     _NT_algorithmRequirements eightVoiceRequirements = {};
     factory->calculateRequirements(oneVoiceRequirements, oneVoiceSpec);
     factory->calculateRequirements(eightVoiceRequirements, eightVoiceSpec);
-    if (oneVoiceRequirements.numParameters != 5 ||
-        eightVoiceRequirements.numParameters != 12 ||
+    if (oneVoiceRequirements.numParameters != 10 ||
+        eightVoiceRequirements.numParameters != 17 ||
         eightVoiceRequirements.sram == 0 || eightVoiceRequirements.dtc == 0)
-        return fail("voice count does not determine the CV pitch parameter count");
+        return fail("voice count does not determine the focused parameter count");
 
     HostInstance midi(factory, 4);
     if (midi.algorithm == NULL || midi.algorithm->parameters == NULL ||
@@ -280,8 +323,40 @@ int main(int argc, char** argv) {
             midi.values[parameter] != voice + 2)
             return fail("pitch CV inputs are not presented sequentially");
     }
-    if (midi.algorithm->parameterPages->pages[1].numParams != 5)
-        return fail("CV/Gate page does not follow the configured voice count");
+    const _NT_parameterPages* pages = midi.algorithm->parameterPages;
+    if (pages->numPages != 4 ||
+        std::strcmp(pages->pages[0].name, "Setup") != 0 ||
+        pages->pages[0].numParams != 1 ||
+        std::strcmp(pages->pages[1].name, "Sound") != 0 ||
+        pages->pages[1].numParams != kNumSoundParameters ||
+        std::strcmp(pages->pages[2].name, "CV/Gate") != 0 ||
+        pages->pages[2].numParams != 5 ||
+        std::strcmp(pages->pages[3].name, "Routing") != 0 ||
+        pages->pages[3].numParams != 2)
+        return fail("parameter pages do not expose one focused synth surface");
+    for (int control = 0; control < kNumSoundParameters; ++control) {
+        const int parameter = midi.synth()->soundParameter(
+            static_cast<SoundParameter>(control));
+        const _NT_parameter& definition = midi.algorithm->parameters[parameter];
+        if (std::strcmp(definition.name, kSoundParameters[control].name) != 0 ||
+            definition.min != 0 || definition.max != 100 ||
+            definition.unit != kNT_unitPercent ||
+            midi.values[parameter] != kSoundParameters[control].def)
+            return fail("focused sound control definition is incorrect");
+    }
+    if (midi.values[midi.synth()->soundParameter(kSoundTone)] != 50 ||
+        midi.values[midi.synth()->soundParameter(kSoundMotion)] != 50 ||
+        midi.values[midi.synth()->soundParameter(kSoundGrain)] != 50 ||
+        midi.values[midi.synth()->soundParameter(kSoundResonance)] != 50 ||
+        midi.values[midi.synth()->soundParameter(kSoundRelease)] != 65)
+        return fail("fresh-load sound controls are not centered with a long release");
+
+    for (int control = 0; control < kNumSoundParameters; ++control) {
+        const double difference = renderSoundControlDifference(
+            factory, static_cast<SoundParameter>(control));
+        if (difference < 0.0005)
+            return fail("a focused sound control did not change rendered audio");
+    }
 
     const int frames = 64;
     std::vector<float> busses(kNT_lastBus * frames, 0.0f);
@@ -406,7 +481,8 @@ int main(int argc, char** argv) {
         !hasHeldMidiNote(heldReplacement.synth(), 80))
         return fail("MIDI replacement did not choose the oldest held voice");
 
-    std::puts("PASS: Icy Beauty renders MIDI and voice-count-driven poly CV/gate audio");
+    std::puts(
+        "PASS: Icy Beauty renders one focused five-control MIDI/CV synth path");
     if (runEndurance)
         return runDenseMidiEndurance(factory);
     return 0;
