@@ -85,6 +85,33 @@ class TargetHardwareEnduranceTest(unittest.TestCase):
             len([name for name in names if name.startswith("Pitch ")]), 8
         )
 
+    def test_target_slot_validation_rejects_changed_sound_setting(self):
+        parameters = [
+            {"parameter_name": name, "value": 0}
+            for name in MODULE.required_target_parameter_names()
+        ]
+        values = {
+            **MODULE.SOUND_SETTINGS,
+            "Output": "Output 1",
+            "MIDI channel": "Omni",
+        }
+        for parameter in parameters:
+            if parameter["parameter_name"] in values:
+                parameter["value"] = values[parameter["parameter_name"]]
+        slot = {
+            "algorithm": {"guid": "NsIb"},
+            "parameter_count": 18,
+            "parameters": parameters,
+        }
+        self.assertEqual(MODULE.validate_target_slot(slot), (True, ""))
+        next(
+            item for item in parameters if item["parameter_name"] == "Grain"
+        )["value"] = 99
+        self.assertEqual(
+            MODULE.validate_target_slot(slot),
+            (False, "Grain changed from 100"),
+        )
+
     def test_evidence_values_match_live_form(self):
         report = {
             "contract": {

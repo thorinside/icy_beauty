@@ -634,7 +634,9 @@ def required_target_parameter_names() -> set[str]:
     }
 
 
-def validate_target_slot(slot: dict) -> tuple[bool, str]:
+def validate_target_slot(
+    slot: dict, *, require_configured_values: bool = True
+) -> tuple[bool, str]:
     algorithm = slot.get("algorithm") if isinstance(slot, dict) else None
     parameters = {
         item.get("parameter_name"): item.get("value")
@@ -647,13 +649,14 @@ def validate_target_slot(slot: dict) -> tuple[bool, str]:
         return False, "slot 0 is not the eight-voice parameter surface"
     if not required_target_parameter_names().issubset(parameters):
         return False, "slot 0 parameter surface is incomplete"
-    for name, value in SOUND_SETTINGS.items():
-        if parameters.get(name) != value:
-            return False, "%s changed from %s" % (name, value)
-    if str(parameters.get("Output", "")).strip() != "Output 1":
-        return False, "Output changed from Output 1"
-    if str(parameters.get("MIDI channel", "")).strip() != "Omni":
-        return False, "MIDI channel changed from Omni"
+    if require_configured_values:
+        for name, value in SOUND_SETTINGS.items():
+            if parameters.get(name) != value:
+                return False, "%s changed from %s" % (name, value)
+        if str(parameters.get("Output", "")).strip() != "Output 1":
+            return False, "Output changed from Output 1"
+        if str(parameters.get("MIDI channel", "")).strip() != "Omni":
+            return False, "MIDI channel changed from Omni"
     return True, ""
 
 
@@ -664,7 +667,9 @@ def wait_for_target_slot(client: McpClient, timeout: float = 30.0) -> dict:
         last_slot = client.call_tool(
             "show_slot", {"slot_index": 0}, timeout=20.0
         )
-        valid, _ = validate_target_slot(last_slot)
+        valid, _ = validate_target_slot(
+            last_slot, require_configured_values=False
+        )
         if valid:
             return last_slot
         time.sleep(0.5)
