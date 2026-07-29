@@ -45,6 +45,23 @@ final physical response check. It writes a JSON report under
 pass. Use `make hardware-endurance-smoke` to exercise the same physical
 plumbing for five seconds without submitting evidence.
 
+If the project owner explicitly approves counting an NsIb-only session that was
+already running before the harness was written, close that interval without
+recreating the preset:
+
+```sh
+python3 scripts/target_hardware_endurance.py \
+  --duration-seconds 5 \
+  --responsiveness-interval-seconds 2 \
+  --existing-session-start '<ISO-8601 timestamp>' \
+  --existing-session-note '<durable start and configuration-transition proof>'
+```
+
+This mode still reruns preflight, verifies the current eight-voice slot and all
+configured values, drives a final dense-MIDI closeout, waits through release,
+and submits the full owner-approved residency interval rather than only the
+closeout duration.
+
 ## AC-004 pass record
 
 Record all of the following:
