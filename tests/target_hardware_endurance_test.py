@@ -1,7 +1,10 @@
 import importlib.util
+import io
 import json
 import sys
+import types
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -59,6 +62,23 @@ class TargetHardwareEnduranceTest(unittest.TestCase):
         for channel in range(16):
             self.assertIn((0xB0 | channel, 123, 0), messages)
             self.assertIn((0xE0 | channel, 0, 64), messages)
+
+    def test_midi_progress_event_cannot_collide_with_outer_event_name(self):
+        worker = MODULE.MidiWorker(SCRIPT_PATH, sys.executable, 1, 0.5)
+        worker.process = types.SimpleNamespace(
+            stdout=io.StringIO(
+                '{"event":"midi-minute","elapsedSeconds":60.0}\n'
+            )
+        )
+        with mock.patch.object(MODULE, "emit_progress") as progress:
+            worker._reader()
+        progress.assert_called_once_with(
+            "midi-worker",
+            workerEvent={
+                "event": "midi-minute",
+                "elapsedSeconds": 60.0,
+            },
+        )
 
     def test_preset_summary_requires_only_nsib_slot_zero(self):
         valid = {

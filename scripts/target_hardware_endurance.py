@@ -540,7 +540,7 @@ class MidiWorker:
             self.events.append(event)
             self.event_queue.put(event)
             if event.get("event") in {"midi-minute", "error", "cleanup-error"}:
-                emit_progress("midi-worker", **event)
+                emit_progress("midi-worker", workerEvent=event)
 
     def wait_for_event(self, name: str, timeout: float) -> dict:
         deadline = time.monotonic() + timeout
