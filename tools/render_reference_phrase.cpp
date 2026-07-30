@@ -106,8 +106,10 @@ bool writePcm16Wav(const char* path, const std::vector<float>& samples) {
     std::fwrite("data", 4, 1, output);
     writeUint32(output, dataBytes);
     for (std::size_t index = 0; index < samples.size(); ++index) {
+        // The plug-in renders volts; the audition WAV uses 5 V as 0 dBFS.
+        const float normalized = samples[index] / kOutputPeakVolts;
         const float clamped =
-            std::max(-1.0f, std::min(0.999969f, samples[index]));
+            std::max(-1.0f, std::min(0.999969f, normalized));
         const int16_t quantized =
             static_cast<int16_t>(std::lround(clamped * 32768.0f));
         writeUint16(output, static_cast<uint16_t>(quantized));

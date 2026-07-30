@@ -749,6 +749,19 @@ int main(int argc, char** argv) {
         midi.values[midi.synth()->soundParameter(kSoundRelease)] != 65)
         return fail("fresh-load sound controls are not centered with a medium-long release");
 
+    const float halfScaleVolts = softLimitedOutputVolts(0.5f);
+    const float positiveOverdriveVolts = softLimitedOutputVolts(1000.0f);
+    const float negativeOverdriveVolts = softLimitedOutputVolts(-1000.0f);
+    if (std::fabs(halfScaleVolts - 2.5f) > 0.000001f ||
+        positiveOverdriveVolts <= 4.99f ||
+        positiveOverdriveVolts >= kOutputPeakVolts ||
+        negativeOverdriveVolts >= -4.99f ||
+        negativeOverdriveVolts <= -kOutputPeakVolts)
+        return fail("output stage is not calibrated to a bipolar 5 V peak");
+    std::puts(
+        "PASS: output is linear below a +/-4.5 V limiter knee and remains "
+        "inside +/-5 V");
+
     {
         const int latencyFrames = 64;
         HostInstance latency(factory, 8);
@@ -849,9 +862,9 @@ int main(int argc, char** argv) {
 
         std::printf(
             "PASS: fresh load renders centered icy controls through Output 1 "
-            "from Omni MIDI with animated audio and a %.3f tail peak after "
-            "250 ms of release\n",
-            endingTailPeak);
+            "from Omni MIDI with a %.3f V signal peak and a %.3f V tail peak "
+            "after 250 ms of release\n",
+            freshPeak, endingTailPeak);
     }
 
     for (int control = 0; control < kNumSoundParameters; ++control) {
@@ -1095,13 +1108,14 @@ int main(int argc, char** argv) {
     float* output1 = busses.data() + 12 * frames;
     std::fill(output1, output1 + frames, 20.0f);
     factory->step(midi.algorithm, busses.data(), frames / 4);
-    if (*std::min_element(output1, output1 + frames) < 15.0f)
+    if (*std::min_element(output1, output1 + frames) <
+        20.0f - kOutputPeakVolts)
         return fail("add output mode did not preserve existing bus audio");
 
     midi.values[kParamOutputMode] = 1;
     std::fill(output1, output1 + frames, 20.0f);
     factory->step(midi.algorithm, busses.data(), frames / 4);
-    if (*std::max_element(output1, output1 + frames) > 5.0f)
+    if (*std::max_element(output1, output1 + frames) > kOutputPeakVolts)
         return fail("replace output mode did not replace existing bus audio");
 
     factory->midiMessage(midi.algorithm, 0x89, 69, 0);
@@ -1187,8 +1201,12 @@ int main(int argc, char** argv) {
     }
     if (eightVoicePeak < 0.1f)
         return fail("eight occupied MIDI voices did not render audible output");
-    if (eightVoicePeak >= 0.98f)
-        return fail("eight occupied MIDI voices exceeded dry-output headroom");
+    if (eightVoicePeak >= kOutputPeakVolts)
+        return fail("eight occupied MIDI voices exceeded the +/-5 V output ceiling");
+    std::printf(
+        "PASS: eight occupied MIDI voices remain inside the +/-5 V ceiling "
+        "with a %.3f V peak\n",
+        eightVoicePeak);
 
     HostInstance sustainedReplacement(factory, 8);
     for (uint8_t note = 60; note < 68; ++note)

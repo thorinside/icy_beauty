@@ -8,6 +8,8 @@ CV/gate control exposes one shared **Gate** input followed by one **Pitch** CV i
 
 MIDI velocity controls loudness with a subtler brightness lift. Sustain behaves like a conventional piano pedal, pitch bend has a fixed ±2-semitone range, and the modulation wheel increases Motion. Aftertouch raises Resonance and adds a smaller amount of Motion: polyphonic pressure remains independent per note, while channel pressure applies across the chord. These mappings are fixed and channel-aware, including when the synth listens in Omni mode; they do not add a user-configurable mapping surface.
 
+Audio is calibrated directly in disting NT bus volts. The synth contribution is linear through ±4.5 V, then soft-limited to remain inside ±5 V (10 Vpp). In Add mode, that ceiling applies to Icy Beauty before it is summed with any signal already present on the destination bus.
+
 Presets use the disting NT host's standard mechanism. **Voices** is restored as the factory specification so the host reconstructs the matching dynamic parameter surface; the five sound controls, MIDI channel, output routing, Gate and Pitch assignments, and every other exposed setting are ordinary system-managed parameter values. The plug-in has no additional private setting that requires custom preset JSON.
 
 This remains an incremental delivery. The approved 30-minute target-hardware
@@ -75,8 +77,8 @@ playing the inferred phrase, and checks pitch, attack, spectral balance,
 second-harmonic level, release shape, and output headroom. The retained
 `analysis/candidate/pre-model-baseline.wav` records the former implementation;
 `analysis/candidate/current-default.wav` is the modelled fresh-load sound for
-auditioning. The comparison is an objective development gate, not a substitute
-for owner listening acceptance.
+auditioning, normalized with ±5 V represented as 0 dBFS. The comparison is an
+objective development gate, not a substitute for owner listening acceptance.
 
 The reference remains development material only. The ARM plug-in build does
 not read, embed, copy, or package the WAV, analysis dependencies, or derived

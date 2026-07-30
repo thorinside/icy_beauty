@@ -15,6 +15,9 @@ enum {
         kNumCommonParameters + 1 + kMaxVoices + kNumSoundParameters,
 };
 
+static const float kOutputPeakVolts = 5.0f;
+static const float kOutputLimiterKneeFraction = 0.9f;
+
 enum VoiceSource {
     kVoiceUnused,
     kVoiceMidi,
@@ -497,6 +500,22 @@ float nextNoise(Voice& voice) {
     return static_cast<float>(state >> 8) * (1.0f / 8388608.0f) - 1.0f;
 }
 
+float softLimitedOutputVolts(float normalizedSample) {
+    const float magnitude = normalizedSample < 0.0f
+                                ? -normalizedSample
+                                : normalizedSample;
+    float limitedMagnitude = magnitude;
+    if (magnitude > kOutputLimiterKneeFraction) {
+        const float excess = magnitude - kOutputLimiterKneeFraction;
+        limitedMagnitude =
+            kOutputLimiterKneeFraction +
+            (1.0f - kOutputLimiterKneeFraction) * excess /
+                (1.0f + excess);
+    }
+    const float volts = kOutputPeakVolts * limitedMagnitude;
+    return normalizedSample < 0.0f ? -volts : volts;
+}
+
 void releaseCvVoices(IcyBeautyAlgorithm* algorithm) {
     for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
         Voice& voice = algorithm->dtc->voices[index];
@@ -659,16 +678,7 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
                 clearVoice(voice);
         }
 
-        const float unboundedSample = voiceGain * mixed;
-        const float magnitude = unboundedSample < 0.0f
-                                    ? -unboundedSample
-                                    : unboundedSample;
-        float sample = unboundedSample;
-        if (magnitude > 0.9f) {
-            const float excess = magnitude - 0.9f;
-            const float limited = 0.9f + 0.08f * excess / (1.0f + excess);
-            sample = unboundedSample < 0.0f ? -limited : limited;
-        }
+        const float sample = softLimitedOutputVolts(voiceGain * mixed);
         output[frame] = replace ? sample : output[frame] + sample;
     }
 }
