@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-labelledby="title description">
+  <title id="title">Icy Beauty</title>
+  <desc id="description">A northern polyphonic voice, illustrated with aurora light, Canadian red, Nordic blue, snow, a maple leaf, and a Nordic cross.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1f33"/>
+      <stop offset="0.55" stop-color="#17324d"/>
+      <stop offset="1" stop-color="#214f5d"/>
+    </linearGradient>
+    <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6ed6c4" stop-opacity="0"/>
+      <stop offset="0.3" stop-color="#6ed6c4" stop-opacity="0.92"/>
+      <stop offset="0.7" stop-color="#f6c85f" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#f6c85f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="snow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7fbfc"/>
+      <stop offset="1" stop-color="#cfe8eb"/>
+    </linearGradient>
+    <filter id="glow" x="-25%" y="-50%" width="150%" height="200%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="420" rx="28" fill="url(#sky)"/>
+  <path d="M-40 126 C180 14 338 196 555 78 S914 28 1240 126" fill="none" stroke="url(#aurora)" stroke-width="30" opacity="0.35" filter="url(#glow)"/>
+  <path d="M-40 126 C180 14 338 196 555 78 S914 28 1240 126" fill="none" stroke="url(#aurora)" stroke-width="8"/>
+  <path d="M-20 190 C204 82 392 212 606 116 S952 86 1220 164" fill="none" stroke="#8ee5d2" stroke-width="2" opacity="0.36"/>
+
+  <g fill="#f7fbfc" opacity="0.68">
+    <circle cx="82" cy="83" r="2.5"/>
+    <circle cx="226" cy="54" r="1.8"/>
+    <circle cx="388" cy="103" r="2.1"/>
+    <circle cx="744" cy="55" r="2.2"/>
+    <circle cx="906" cy="119" r="1.8"/>
+    <circle cx="1112" cy="71" r="2.6"/>
+  </g>
+
+  <path d="M0 329 L142 248 L224 295 L365 191 L456 286 L578 224 L706 302 L820 216 L953 293 L1057 232 L1200 320 L1200 420 L0 420 Z" fill="#112b3d" opacity="0.92"/>
+  <path d="M0 357 L154 292 L241 332 L372 240 L464 326 L582 271 L708 342 L823 264 L958 333 L1060 278 L1200 349 L1200 420 L0 420 Z" fill="url(#snow)" opacity="0.96"/>
+
+  <g transform="translate(92 84) scale(0.72)" fill="#d52b1e" opacity="0.96">
+    <path d="M50 0 L60 26 L82 14 L76 43 L105 39 L88 62 L111 75 L80 83 L86 110 L57 95 L60 132 L40 132 L43 95 L14 110 L20 83 L-11 75 L12 62 L-5 39 L24 43 L18 14 L40 26 Z"/>
+  </g>
+
+  <g transform="translate(1026 74)" opacity="0.94">
+    <rect width="92" height="92" rx="46" fill="#f7fbfc" opacity="0.12"/>
+    <rect x="38" y="14" width="12" height="64" rx="6" fill="#f7fbfc"/>
+    <rect x="14" y="37" width="64" height="12" rx="6" fill="#f7fbfc"/>
+    <rect x="41" y="14" width="6" height="64" fill="#e9b949"/>
+    <rect x="14" y="40" width="64" height="6" fill="#e9b949"/>
+  </g>
+
+  <text x="600" y="194" text-anchor="middle" fill="#f7fbfc" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="76" font-weight="650" letter-spacing="3">ICY BEAUTY</text>
+  <text x="600" y="238" text-anchor="middle" fill="#bde6df" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="22" font-weight="500" letter-spacing="5">A NORTHERN POLYPHONIC VOICE</text>
+  <line x1="446" y1="263" x2="754" y2="263" stroke="#d52b1e" stroke-width="4"/>
+  <line x1="530" y1="270" x2="670" y2="270" stroke="#e9b949" stroke-width="2"/>
+</svg>

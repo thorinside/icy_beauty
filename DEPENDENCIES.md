@@ -1,5 +1,8 @@
 # Dependencies
 
+Icy Beauty’s source code and documentation are released under the
+[MIT Licence](LICENSE).
+
 ## Expert Sleepers distingNT API
 
 - Repository: <https://github.com/expertsleepersltd/distingNT_API>
@@ -7,7 +10,9 @@
 - License: MIT (`distingNT_API/LICENSE`)
 - Use: compile-time host API for the Expert Sleepers disting NT plug-in
 
-The API is license-compatible with this project. The Git submodule pin makes the development interface reproducible; updates must be reviewed and pinned deliberately.
+The API is license-compatible with this project. The Git submodule pin makes
+the development interface reproducible; updates must be reviewed and pinned
+deliberately.
 
 ## Physical latency harness
 

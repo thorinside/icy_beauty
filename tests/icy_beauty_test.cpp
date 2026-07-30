@@ -582,6 +582,8 @@ int main(int argc, char** argv) {
         return fail("plugin factory is unavailable");
     if (std::strcmp(factory->name, "Icy Beauty") != 0)
         return fail("plugin factory has the wrong product name");
+    if (factory->guid != NT_MULTICHAR('T', 'h', 'I', 'b'))
+        return fail("plugin factory GUID is not ThIb");
     if ((factory->tags & kNT_tagInstrument) == 0)
         return fail("plugin factory is not tagged as an instrument");
     if (factory->calculateRequirements == NULL || factory->construct == NULL ||

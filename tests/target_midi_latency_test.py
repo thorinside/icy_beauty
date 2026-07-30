@@ -67,7 +67,7 @@ def make_capture(latency_seconds=0.004, trials=8):
 
 
 class TargetMidiLatencyTest(unittest.TestCase):
-    def test_initial_preset_requires_only_configured_eight_voice_nsib(self):
+    def test_initial_preset_requires_only_configured_eight_voice_thib(self):
         names = {
             "Output": "Output 1",
             "Output mode": "Add",
@@ -85,7 +85,7 @@ class TargetMidiLatencyTest(unittest.TestCase):
         }
         slot = {
             "slot_index": 0,
-            "algorithm": {"guid": "NsIb", "name": "Icy Beauty"},
+            "algorithm": {"guid": "ThIb", "name": "Icy Beauty"},
             "parameter_count": 18,
             "parameters": [
                 {"parameter_name": name, "value": value}
@@ -97,7 +97,7 @@ class TargetMidiLatencyTest(unittest.TestCase):
             "slots": [
                 {
                     "slot_index": 0,
-                    "algorithm": {"guid": "NsIb", "name": "Icy Beauty"},
+                    "algorithm": {"guid": "ThIb", "name": "Icy Beauty"},
                 }
             ],
         }

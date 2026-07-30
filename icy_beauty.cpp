@@ -684,7 +684,7 @@ void step(_NT_algorithm* self, float* busFrames, int numFramesBy4) {
 }
 
 static const _NT_factory kFactory = {
-    .guid = NT_MULTICHAR('N', 's', 'I', 'b'),
+    .guid = NT_MULTICHAR('T', 'h', 'I', 'b'),
     .name = "Icy Beauty",
     .description = "A haunting, delicate software synthesizer",
     .numSpecifications = ARRAY_SIZE(kSpecifications),

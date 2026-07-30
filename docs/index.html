@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#071725">
+    <meta
+      name="description"
+      content="Icy Beauty user guide: a northern polyphonic synthesizer algorithm for Expert Sleepers disting NT."
+    >
+    <title>Icy Beauty — User Guide</title>
+    <link rel="stylesheet" href="manual.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <img
+        class="hero-art"
+        src="icy-beauty-header.svg"
+        alt="Icy Beauty, a northern polyphonic voice"
+      >
+      <div class="topline">
+        <p class="eyebrow">User guide · Guide d’utilisation</p>
+        <div class="format-links" aria-label="Documentation formats">
+          <a class="pill" href="../README.md">README.md</a>
+          <a class="pill" href="PARAMETERS.md">Parameters.md</a>
+          <a class="pill" href="parameters.html">Parameter guide</a>
+        </div>
+      </div>
+      <nav class="main-nav" aria-label="Manual sections">
+        <a href="#algorithm">Algorithm</a>
+        <a href="#sound">Sound parameters</a>
+        <a href="#setup">Setup</a>
+        <a href="#midi">MIDI</a>
+        <a href="#cv">CV/Gate</a>
+        <a href="#output">Output</a>
+        <a href="#install">Install</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Canadian breadth · Nordic restraint</p>
+          <h1 id="page-title">Five controls. One clear northern voice.</h1>
+          <p class="lede">
+            Icy Beauty is a focused polyphonic synthesizer algorithm for the
+            Expert Sleepers disting NT. It moves from warm and woody to bright,
+            grainy, and glass-like without changing engines or hiding controls.
+          </p>
+        </div>
+        <aside class="note">
+          <strong>Factory sound</strong>
+          <p>
+            Four voices. Tone, Motion, Grain, and Resonance at 50%. Release at
+            65%. MIDI Omni to Output 1.
+          </p>
+        </aside>
+      </section>
+
+      <section class="section" id="algorithm">
+        <div class="section-heading">
+          <div>
+            <h2>The algorithm, simply</h2>
+            <p>
+              Every note follows the same path. The controls change its colour,
+              movement, texture, ring, and fade.
+            </p>
+          </div>
+        </div>
+        <div class="signal-flow" aria-label="Icy Beauty signal flow">
+          <div class="signal-step">
+            <b>Three tone layers</b>
+            <span>A rounded main note, a quiet octave, and a high interval.</span>
+          </div>
+          <div class="signal-step">
+            <b>Tone</b>
+            <span>Balances the layers and sets brightness.</span>
+          </div>
+          <div class="signal-step">
+            <b>Motion + Grain</b>
+            <span>Add slow drift and fine irregular texture.</span>
+          </div>
+          <div class="signal-step">
+            <b>Resonance</b>
+            <span>Adds a tuned glass-like ring.</span>
+          </div>
+          <div class="signal-step">
+            <b>Release</b>
+            <span>Shapes the final fade into a ±5 V output.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="sound">
+        <div class="section-heading">
+          <div>
+            <h2>Sound parameters</h2>
+            <p>
+              These five normal host parameters are the complete sound surface.
+              Each can also be mapped to CV in the disting NT.
+            </p>
+          </div>
+        </div>
+        <div class="card-grid">
+          <article class="card">
+            <span class="value">Default 50%</span>
+            <h3>Tone</h3>
+            <div class="range" style="--fill: 50%"></div>
+            <p>Dark and rounded at the bottom; brighter and more layered at the top.</p>
+          </article>
+          <article class="card">
+            <span class="value">Default 50%</span>
+            <h3>Motion</h3>
+            <div class="range" style="--fill: 50%"></div>
+            <p>Slow independent pitch movement on each voice, up to about ±13 cents.</p>
+          </article>
+          <article class="card">
+            <span class="value">Default 50%</span>
+            <h3>Grain</h3>
+            <div class="range" style="--fill: 50%"></div>
+            <p>Fine random pitch variation and noise, from clean to weathered.</p>
+          </article>
+          <article class="card">
+            <span class="value">Default 50%</span>
+            <h3>Resonance</h3>
+            <div class="range" style="--fill: 50%"></div>
+            <p>Moves from a dry note to a clear tuned, glass-like ring.</p>
+          </article>
+          <article class="card">
+            <span class="value">Default 65%</span>
+            <h3>Release</h3>
+            <div class="range" style="--fill: 65%"></div>
+            <p>Sets the fade after note-off, from about 80 ms to 12 seconds.</p>
+          </article>
+        </div>
+        <p>
+          <a href="parameters.html">Open the detailed parameter field guide →</a>
+        </p>
+      </section>
+
+      <section class="section" id="setup">
+        <div class="section-heading">
+          <div>
+            <h2>Setup and routing</h2>
+            <p>
+              Choose the voice count when adding the algorithm. Everything else
+              appears as a normal parameter.
+            </p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Default</th>
+                <th>What it controls</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Voices</td>
+                <td>4</td>
+                <td>One to eight shared MIDI/CV voices.</td>
+              </tr>
+              <tr>
+                <td>MIDI channel</td>
+                <td>Omni</td>
+                <td>Every channel, or one selected channel from 1–16.</td>
+              </tr>
+              <tr>
+                <td>Output</td>
+                <td>Output 1</td>
+                <td>The destination bus.</td>
+              </tr>
+              <tr>
+                <td>Output mode</td>
+                <td>Add</td>
+                <td>Adds to the bus; Replace overwrites it.</td>
+              </tr>
+              <tr>
+                <td>Gate</td>
+                <td>Input 1</td>
+                <td>The shared CV gate.</td>
+              </tr>
+              <tr>
+                <td>Pitch 1…8</td>
+                <td>Inputs 2…9</td>
+                <td>One 1 V/octave input for each configured voice.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="midi">
+        <div class="section-heading">
+          <div>
+            <h2>MIDI control</h2>
+            <p>
+              The performance mappings are fixed, useful, and ready without a
+              setup page.
+            </p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Control</th>
+                <th>Response</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Velocity</td><td>Level, with a small brightness change.</td></tr>
+              <tr><td>Pitch bend</td><td>Fixed ±2-semitone range.</td></tr>
+              <tr><td>Mod wheel</td><td>Raises Motion.</td></tr>
+              <tr><td>Sustain pedal</td><td>Holds released notes until pedal-up.</td></tr>
+              <tr><td>Poly aftertouch</td><td>Raises Resonance and adds a little Motion per note.</td></tr>
+              <tr><td>Channel pressure</td><td>Applies that pressure response across the chord.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="cv">
+        <div class="section-heading">
+          <div>
+            <h2>CV and gate control</h2>
+            <p>
+              One shared Gate plays the current pitches together. MIDI and CV
+              use the same voice pool.
+            </p>
+          </div>
+        </div>
+        <div class="two-column">
+          <article class="card">
+            <h3>Gate behaviour</h3>
+            <ul>
+              <li>A rising Gate captures the current Pitch inputs.</li>
+              <li>A falling Gate releases the CV voices.</li>
+              <li>Held MIDI notes take priority when both sources need a voice.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Four-voice defaults</h3>
+            <ul>
+              <li>Input 1: Gate</li>
+              <li>Inputs 2–5: Pitch 1–4</li>
+              <li>More voices add Pitch inputs up to Input 9.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="output">
+        <div class="section-heading">
+          <div>
+            <h2>Output level</h2>
+            <p>
+              The synth works directly in disting NT bus volts and is ready for
+              Eurorack use.
+            </p>
+          </div>
+        </div>
+        <div class="callout">
+          <div class="volts">±5 V</div>
+          <p>
+            The response stays clean through ±4.5 V, then limits smoothly to a
+            maximum inside ±5 V (10 Vpp). In Add mode, that ceiling is applied
+            before Icy Beauty is mixed with the existing bus signal.
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="install">
+        <div class="section-heading">
+          <div>
+            <h2>Install the prebuilt plug-in</h2>
+            <p>No compiler or development toolchain is needed.</p>
+          </div>
+        </div>
+        <div class="two-column">
+          <article class="card">
+            <h3>Three steps</h3>
+            <ol>
+              <li>Download <code>icy_beauty-plugin.zip</code> from Releases.</li>
+              <li>Unzip it at the root of the disting NT SD card.</li>
+              <li>Rescan plug-ins and add Icy Beauty.</li>
+            </ol>
+          </article>
+          <article class="card">
+            <h3>Identity</h3>
+            <p>
+              The public GUID is <code>ThIb</code>. Presets made with the
+              earlier development GUID <code>NsIb</code> need the old algorithm
+              removed and Icy Beauty added again.
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>MIT Licence · © 2026 Neal Sanche</p>
+      <p>Independent third-party project for Expert Sleepers disting NT.</p>
+    </footer>
+  </body>
+</html>

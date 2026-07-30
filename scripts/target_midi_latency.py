@@ -2,9 +2,9 @@
 """Measure and record physical MIDI-note-on latency for Icy Beauty AC-005.
 
 The test temporarily adds the disting NT USB audio (to host) algorithm after
-the existing eight-voice NsIb slot, routes USB channel 1 from NsIb's output,
+the existing eight-voice ThIb slot, routes USB channel 1 from ThIb's output,
 captures that channel while sending isolated CoreMIDI note-ons, and restores
-the original NsIb-only preset in all exit paths.
+the original ThIb-only preset in all exit paths.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from target_hardware_endurance import (
 ANALYZER_VERSION = 1
 PROJECT_ID = "0966eaa1-b61c-4a7f-a172-d7a37df994dd"
 CRITERION_KEY = "ac-005"
-PLUGIN_GUID = "NsIb"
+PLUGIN_GUID = "ThIb"
 USB_AUDIO_GUID = "usbt"
 PRESET_NAME = "Icy Beauty"
 DEVICE_NAME = "disting NT"
@@ -116,10 +116,10 @@ def validate_initial_preset(preset: dict, slot: dict) -> tuple[bool, str]:
     if normalize_nt_value(preset.get("name")) != PRESET_NAME:
         return False, "active preset is not Icy Beauty"
     if len(populated) != 1:
-        return False, "expected the active preset to contain only NsIb"
+        return False, "expected the active preset to contain only ThIb"
     algorithm = populated[0].get("algorithm") or {}
     if populated[0].get("slot_index") != 0 or algorithm.get("guid") != PLUGIN_GUID:
-        return False, "slot 0 is not NsIb"
+        return False, "slot 0 is not ThIb"
     valid, reason = validate_target_slot(slot)
     if not valid:
         return False, reason
@@ -188,7 +188,7 @@ def add_usb_capture(client: McpClient, source_output: str) -> dict:
         raise LatencyError("temporary USB capture topology did not save: %s" % saved)
 
     preset = client.call_tool("show_preset", {}, timeout=15.0)
-    nsib_slot = client.call_tool("show_slot", {"slot_index": 0}, timeout=15.0)
+    plugin_slot = client.call_tool("show_slot", {"slot_index": 0}, timeout=15.0)
     usb_slot = client.call_tool("show_slot", {"slot_index": 1}, timeout=15.0)
     routing = client.call_tool("show_routing", {}, timeout=15.0)
     populated = [
@@ -203,13 +203,13 @@ def add_usb_capture(client: McpClient, source_output: str) -> dict:
         ]
         != [PLUGIN_GUID, USB_AUDIO_GUID]
     ):
-        raise LatencyError("temporary topology is not NsIb then usbt")
-    nsib_parameters = slot_parameter_map(nsib_slot)
+        raise LatencyError("temporary topology is not ThIb then usbt")
+    plugin_parameters = slot_parameter_map(plugin_slot)
     usb_parameters = slot_parameter_map(usb_slot)
-    if nsib_parameters.get("Output") != source_output:
-        raise LatencyError("NsIb output changed during capture setup")
+    if plugin_parameters.get("Output") != source_output:
+        raise LatencyError("ThIb output changed during capture setup")
     if usb_parameters.get("USB channel 1 from") != source_output:
-        raise LatencyError("USB channel 1 is not fed by the NsIb output")
+        raise LatencyError("USB channel 1 is not fed by the ThIb output")
     for channel in range(2, INPUT_CHANNELS + 1):
         if usb_parameters.get("USB channel %d from" % channel) != "None":
             raise LatencyError("USB capture has an unexpected additional channel")
@@ -218,7 +218,7 @@ def add_usb_capture(client: McpClient, source_output: str) -> dict:
         "edits": edits,
         "save": saved,
         "preset": preset,
-        "nsibSlot": nsib_slot,
+        "pluginSlot": plugin_slot,
         "usbSlot": usb_slot,
         "routing": routing,
         "sourceOutput": source_output,
@@ -226,7 +226,7 @@ def add_usb_capture(client: McpClient, source_output: str) -> dict:
     }
 
 
-def restore_nsib_only(
+def restore_plugin_only(
     client: McpClient, original_preset: dict, original_slot: dict
 ) -> dict:
     before = client.call_tool("show_preset", {}, timeout=15.0)
@@ -250,13 +250,13 @@ def restore_nsib_only(
         )
     saved = client.call_tool("save", {}, timeout=20.0)
     if saved.get("success") is not True:
-        raise LatencyError("restored NsIb-only preset did not save: %s" % saved)
+        raise LatencyError("restored ThIb-only preset did not save: %s" % saved)
     after = client.call_tool("show_preset", {}, timeout=15.0)
     slot = client.call_tool("show_slot", {"slot_index": 0}, timeout=15.0)
     if normalize_nt_value(after) != normalize_nt_value(original_preset):
         raise LatencyError("preset summary did not return to its original state")
     if canonical_slot(slot) != canonical_slot(original_slot):
-        raise LatencyError("NsIb slot did not return to its original state")
+        raise LatencyError("ThIb slot did not return to its original state")
     return {
         "before": before,
         "remove": removed,
@@ -830,15 +830,15 @@ def evidence_notes(report: dict) -> str:
     )
     return (
         "Physical target report %s. On the same approved eight-voice maximum-"
-        "control NsIb patch, a temporary USB audio (to host) slot routed USB "
-        "channel 1 from NsIb %s and the host captured disting NT input 1 at "
+        "control ThIb patch, a temporary USB audio (to host) slot routed USB "
+        "channel 1 from ThIb %s and the host captured disting NT input 1 at "
         "48 kHz/24-bit mono. One native process bracketed each CoreMIDI send "
         "and timestamped every PortAudio input block on PortAudio's shared "
         "stream clock. All %d isolated note-ons passed; conservative upper "
         "latencies were [%s] ms, maximum %.3f ms below the 10 ms limit. "
         "The bound uses the earliest possible send time and the end of the "
         "%d-sample onset-confirmation window. WAV SHA-256 %s. The temporary "
-        "USB slot was removed and the original NsIb-only preset was verified "
+        "USB slot was removed and the original ThIb-only preset was verified "
         "exactly restored. Retained 30-minute report %s has %d checks and a "
         "%.2f%% maximum observed processing use, below 75%%. Tested source "
         "commit %s."
@@ -1180,7 +1180,7 @@ def run_latency(args) -> tuple[dict, Path]:
             and mutation_attempted
         ):
             try:
-                report["presetRestoration"] = restore_nsib_only(
+                report["presetRestoration"] = restore_plugin_only(
                     nt_client, original_preset, original_slot
                 )
             except Exception as error:  # noqa: BLE001

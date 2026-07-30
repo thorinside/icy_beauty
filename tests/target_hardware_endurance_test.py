@@ -80,13 +80,13 @@ class TargetHardwareEnduranceTest(unittest.TestCase):
             },
         )
 
-    def test_preset_summary_requires_only_nsib_slot_zero(self):
+    def test_preset_summary_requires_only_thib_slot_zero(self):
         valid = {
             "name": "Icy Beauty          ",
             "slots": [
                 {
                     "slot_index": 0,
-                    "algorithm": {"guid": "NsIb", "name": "Icy Beauty"},
+                    "algorithm": {"guid": "ThIb", "name": "Icy Beauty"},
                 }
             ],
         }
@@ -119,7 +119,7 @@ class TargetHardwareEnduranceTest(unittest.TestCase):
             if parameter["parameter_name"] in values:
                 parameter["value"] = values[parameter["parameter_name"]]
         slot = {
-            "algorithm": {"guid": "NsIb"},
+            "algorithm": {"guid": "ThIb"},
             "parameter_count": 18,
             "parameters": parameters,
         }

@@ -3,7 +3,7 @@
 
 The controller process reruns the native/ARM preflight, uses nt_helper MCP for
 preset setup and repeated physical responsiveness checks, and launches a small
-MIDI worker with the existing ntpush Python environment. A passing 30-minute
+MIDI worker with the existing MIDI Python environment. A passing 30-minute
 run can submit the exact AC-004 evidence form through Substrate MCP.
 """
 
@@ -32,7 +32,7 @@ ANALYZER_VERSION = 1
 MCP_PROTOCOL_VERSION = "2025-03-26"
 PROJECT_ID = "0966eaa1-b61c-4a7f-a172-d7a37df994dd"
 CRITERION_KEY = "ac-004"
-PLUGIN_GUID = "NsIb"
+PLUGIN_GUID = "ThIb"
 PLUGIN_NAME = "Icy Beauty"
 PRESET_NAME = "Icy Beauty"
 MIDI_DEVICE_NAME = "disting NT"
@@ -619,7 +619,7 @@ def validate_preset_summary(preset: dict) -> tuple[bool, str]:
         return False, "expected exactly one populated slot"
     algorithm = populated[0].get("algorithm") or {}
     if populated[0].get("slot_index") != 0 or algorithm.get("guid") != PLUGIN_GUID:
-        return False, "slot 0 is not NsIb"
+        return False, "slot 0 is not ThIb"
     return True, ""
 
 
@@ -644,7 +644,7 @@ def validate_target_slot(
         if isinstance(item, dict)
     }
     if not isinstance(algorithm, dict) or algorithm.get("guid") != PLUGIN_GUID:
-        return False, "slot 0 is not NsIb"
+        return False, "slot 0 is not ThIb"
     if slot.get("parameter_count") != 18:
         return False, "slot 0 is not the eight-voice parameter surface"
     if not required_target_parameter_names().issubset(parameters):
@@ -674,7 +674,7 @@ def wait_for_target_slot(client: McpClient, timeout: float = 30.0) -> dict:
             return last_slot
         time.sleep(0.5)
     raise EnduranceError(
-        "eight-voice NsIb parameter surface did not become ready: %s"
+        "eight-voice ThIb parameter surface did not become ready: %s"
         % last_slot
     )
 
@@ -693,7 +693,7 @@ def configure_target_preset(client: McpClient) -> dict:
         or created.get("algorithms_added") != 1
         or created.get("algorithms_failed") != 0
     ):
-        raise EnduranceError("failed to create eight-voice NsIb preset: %s" % created)
+        raise EnduranceError("failed to create eight-voice ThIb preset: %s" % created)
     wait_for_target_slot(client)
     edits = {}
     for parameter_name, value in SOUND_SETTINGS.items():
@@ -854,9 +854,9 @@ def evidence_values(report: dict) -> dict:
     return {
         "testedFirmware": report["midi"]["ready"]["firmware"],
         "hostConfiguration": (
-            "Physical Expert Sleepers disting NT; API v13 plugin NsIb; "
+            "Physical Expert Sleepers disting NT; API v13 plugin ThIb; "
             "nt_helper %s over MCP; live preset and CPU state polled every "
-            "%.1f seconds. The preset intentionally contains only NsIb, so "
+            "%.1f seconds. The preset intentionally contains only ThIb, so "
             "the separate USB audio (to host) algorithm is not present. "
             "Same-commit accelerated native endurance and ARM preflight were "
             "rerun immediately before the physical test."
@@ -866,7 +866,7 @@ def evidence_values(report: dict) -> dict:
             )
         ),
         "patchSettings": (
-            "NsIb only in slot 0; Voices 8; Output 1; MIDI Omni; "
+            "ThIb only in slot 0; Voices 8; Output 1; MIDI Omni; "
             "Tone 100, Motion 100, Grain 100, Resonance 100, Release 100. "
             "All approved synthesis features remained enabled at their normal "
             "implementation quality."
@@ -891,11 +891,11 @@ def evidence_notes(report: dict) -> str:
         "Completed %.2f uninterrupted minutes with %d dense-MIDI activity cycles, "
         "%d successful nt_helper preset/CPU responsiveness checks and no failed "
         "checks; maximum observed processing use was %.2f%%. The physical preset "
-        "contained only eight-voice NsIb throughout and passed the final "
+        "contained only eight-voice ThIb throughout and passed the final "
         "post-release check. Same-commit make endurance inspect preflight also "
         "passed, including accelerated continuous-audio, finite-sample, and "
         "note-cleanup assertions. Per the owner-approved boundary, no separate USB "
-        "audio (to host) slot was added to the NsIb-only physical preset."
+        "audio (to host) slot was added to the ThIb-only physical preset."
         % (
             report["reportPath"],
             report["source"]["git"]["commit"],

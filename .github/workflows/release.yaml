@@ -1,0 +1,60 @@
+name: Build and Release Icy Beauty
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-dev zip unzip
+
+      - name: Verify toolchain
+        run: |
+          arm-none-eabi-g++ --version
+          arm-none-eabi-nm --version
+          arm-none-eabi-readelf --version
+
+      - name: Build and inspect plugin
+        run: |
+          make ARM_CXX=arm-none-eabi-g++ hardware inspect
+          arm-none-eabi-size -A plugins/icy_beauty.o
+
+      - name: Prepare release archive
+        run: |
+          mkdir -p release/programs/plug-ins
+          cp plugins/icy_beauty.o release/programs/plug-ins/
+          cd release
+          zip -r ../icy_beauty-plugin.zip programs
+          cd ..
+          unzip -l icy_beauty-plugin.zip
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: icy_beauty-plugin
+          path: icy_beauty-plugin.zip
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: icy_beauty-plugin.zip
+          generate_release_notes: true
