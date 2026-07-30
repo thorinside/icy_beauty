@@ -93,7 +93,7 @@ inspect: $(PLUGIN)
 	@$(ARM_NM) --defined-only $(PLUGIN) | grep -Eq '[[:space:]]pluginEntry$$' \
 		|| (echo "pluginEntry export is missing" >&2; exit 1)
 	@unexpected="$$( $(ARM_NM) -u $(PLUGIN) | awk '{print $$2}' | \
-		grep -Ev '^(NT_globals|_GLOBAL_OFFSET_TABLE_|exp2f)$$' || true )"; \
+		grep -Ev '^(NT_algorithmIndex|NT_globals|NT_parameterOffset|NT_setParameterFromAudio|NT_updateParameterDefinition|_GLOBAL_OFFSET_TABLE_|exp2f)$$' || true )"; \
 		test -z "$$unexpected" \
 		|| (echo "Unexpected undefined symbols: $$unexpected" >&2; exit 1)
 	@echo "PASS: $(PLUGIN) is a relocatable ARM plugin with pluginEntry"
