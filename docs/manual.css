@@ -390,30 +390,6 @@ code {
   font-size: 0.9em;
 }
 
-.callout {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 16px;
-  align-items: center;
-  padding: 24px;
-  border: 1px solid rgba(112, 213, 194, 0.3);
-  border-radius: 16px;
-  background: linear-gradient(105deg, rgba(112, 213, 194, 0.12), rgba(23, 59, 86, 0.34));
-}
-
-.volts {
-  color: var(--aurora);
-  font-size: clamp(2rem, 5vw, 3.8rem);
-  font-weight: 800;
-  letter-spacing: -0.05em;
-  white-space: nowrap;
-}
-
-.callout p {
-  margin: 0;
-  color: var(--muted);
-}
-
 .parameter {
   display: grid;
   grid-template-columns: minmax(140px, 0.3fr) minmax(0, 0.7fr);
@@ -556,10 +532,6 @@ code {
   th,
   td {
     padding: 12px;
-  }
-
-  .callout {
-    grid-template-columns: 1fr;
   }
 }
 

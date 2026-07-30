@@ -108,17 +108,6 @@ With four voices, the default inputs are:
 Choosing more voices adds the matching Pitch inputs, up to Pitch 8 on Input 9.
 Held MIDI notes take priority if MIDI and CV need the same voice.
 
-## Output level
-
-The algorithm produces a proper bipolar Eurorack signal:
-
-- clean response through **±4.5 V**;
-- smooth limiting above that level; and
-- a maximum synth output inside **±5 V** (**10 Vpp**).
-
-In **Add** mode, the ±5 V limit applies to Icy Beauty before it is added to the
-signal already on the bus.
-
 ## Install
 
 1. Download `icy_beauty-plugin.zip` from the latest
@@ -129,9 +118,6 @@ signal already on the bus.
 The archive installs `icy_beauty.o` at
 `/programs/plug-ins/icy_beauty.o`. No compiler or development toolchain is
 required.
-
-The public plug-in GUID is `ThIb`. If a preset used the earlier development
-GUID `NsIb`, remove that old algorithm and add Icy Beauty again.
 
 ## Licence
 

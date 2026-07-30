@@ -32,7 +32,6 @@
         <a href="#setup">Setup</a>
         <a href="#midi">MIDI</a>
         <a href="#cv">CV/Gate</a>
-        <a href="#output">Output</a>
         <a href="#install">Install</a>
       </nav>
     </header>
@@ -253,26 +252,6 @@
         </div>
       </section>
 
-      <section class="section" id="output">
-        <div class="section-heading">
-          <div>
-            <h2>Output level</h2>
-            <p>
-              The synth works directly in disting NT bus volts and is ready for
-              Eurorack use.
-            </p>
-          </div>
-        </div>
-        <div class="callout">
-          <div class="volts">±5 V</div>
-          <p>
-            The response stays clean through ±4.5 V, then limits smoothly to a
-            maximum inside ±5 V (10 Vpp). In Add mode, that ceiling is applied
-            before Icy Beauty is mixed with the existing bus signal.
-          </p>
-        </div>
-      </section>
-
       <section class="section" id="install">
         <div class="section-heading">
           <div>
@@ -280,24 +259,14 @@
             <p>No compiler or development toolchain is needed.</p>
           </div>
         </div>
-        <div class="two-column">
-          <article class="card">
-            <h3>Three steps</h3>
-            <ol>
-              <li>Download <code>icy_beauty-plugin.zip</code> from Releases.</li>
-              <li>Unzip it at the root of the disting NT SD card.</li>
-              <li>Rescan plug-ins and add Icy Beauty.</li>
-            </ol>
-          </article>
-          <article class="card">
-            <h3>Identity</h3>
-            <p>
-              The public GUID is <code>ThIb</code>. Presets made with the
-              earlier development GUID <code>NsIb</code> need the old algorithm
-              removed and Icy Beauty added again.
-            </p>
-          </article>
-        </div>
+        <article class="card">
+          <h3>Three steps</h3>
+          <ol>
+            <li>Download <code>icy_beauty-plugin.zip</code> from Releases.</li>
+            <li>Unzip it at the root of the disting NT SD card.</li>
+            <li>Rescan plug-ins and add Icy Beauty.</li>
+          </ol>
+        </article>
       </section>
     </main>
 
