@@ -33,6 +33,7 @@
         <a href="#resonance">Resonance</a>
         <a href="#release">Release</a>
         <a href="#voices">Voices</a>
+        <a href="#cv-gate">CV/Gate</a>
         <a href="#pitch-offsets">Pitch offsets</a>
         <a href="#patches">Patches</a>
       </nav>
@@ -222,21 +223,56 @@
           </div>
           <div class="parameter-copy">
             <p>
-              Choose one to eight voices when adding the algorithm. MIDI and CV
-              share this pool. Output gain is adjusted for the count so adding
-              voices does not cause a large level jump.
+              Choose one to sixteen voices when adding the algorithm. The
+              default is eight. MIDI and CV share this pool, and output gain is
+              adjusted so adding voices does not cause a large level jump.
             </p>
             <div class="table-wrap">
               <table>
                 <tbody>
                   <tr><td>1</td><td>Bass, melody, or external arpeggiation</td></tr>
                   <tr><td>2</td><td>Intervals and duophonic lines</td></tr>
-                  <tr><td>4</td><td>The balanced default</td></tr>
+                  <tr><td>4</td><td>Compact chords</td></tr>
                   <tr><td>6</td><td>Extended chords</td></tr>
-                  <tr><td>8</td><td>Full polyphony and dense MIDI playing</td></tr>
+                  <tr><td>8</td><td>The balanced default</td></tr>
+                  <tr><td>12</td><td>Dense chords with several CV voices</td></tr>
+                  <tr><td>16</td><td>Maximum MIDI or CV polyphony</td></tr>
                 </tbody>
               </table>
             </div>
+          </div>
+        </article>
+
+        <article class="parameter" id="cv-gate">
+          <div class="parameter-label">
+            <p>Polyphonic control</p>
+            <h2>CV/Gate groups</h2>
+          </div>
+          <div class="parameter-copy">
+            <p>
+              Choose zero to six gate groups when adding the algorithm; the
+              default is four. Every Gate input starts at None and every Count
+              starts at 0, leaving all voices available to MIDI until CV is
+              explicitly connected.
+            </p>
+            <p>
+              Each group’s pitch buses immediately follow its selected gate.
+              Gate on Input 9 with Count 3 reads pitches from Inputs 10, 11,
+              and 12. Count is limited to 11, the remaining Voices, and the
+              physical buses after the gate input.
+            </p>
+            <p>
+              Gates rise above 1.0 V and fall below 0.5 V. Sample &amp; hold
+              Off tracks pitch while high; On captures pitch at the rising
+              edge. Increasing Count under a held gate waits for the next edge,
+              while decreasing it releases the removed voices. A retrigger
+              during an audible release tail resumes smoothly.
+            </p>
+            <p>
+              Gate groups reserve fixed voice partitions in group order. MIDI
+              uses the unreserved remainder, so MIDI and CV never steal from
+              one another.
+            </p>
           </div>
         </article>
 

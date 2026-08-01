@@ -50,8 +50,9 @@
         <aside class="note">
           <strong>Factory sound</strong>
           <p>
-            Four voices. Tone, Motion, Grain, and Resonance at 50%. Release at
-            65%. MIDI Omni to Output 1.
+            Eight voices. Four disconnected gate-group control sets. Tone,
+            Motion, Grain, and Resonance at 50%. Release at 65%. MIDI Omni to
+            Output 1.
           </p>
         </aside>
       </section>
@@ -142,8 +143,8 @@
           <div>
             <h2>Setup and routing</h2>
             <p>
-              Choose the voice count when adding the algorithm. Everything else
-              appears as a normal parameter.
+              Choose the voice and gate-group counts when adding the algorithm.
+              Everything else appears as a normal parameter.
             </p>
           </div>
         </div>
@@ -159,8 +160,13 @@
             <tbody>
               <tr>
                 <td>Voices</td>
+                <td>8</td>
+                <td>One to sixteen shared MIDI/CV voices.</td>
+              </tr>
+              <tr>
+                <td>Gate groups</td>
                 <td>4</td>
-                <td>One to eight shared MIDI/CV voices.</td>
+                <td>Zero to six independent CV/gate control sets.</td>
               </tr>
               <tr>
                 <td>MIDI channel</td>
@@ -187,19 +193,13 @@
                 <td>Add</td>
                 <td>Adds to the bus; Replace overwrites it.</td>
               </tr>
-              <tr>
-                <td>Gate</td>
-                <td>Input 1</td>
-                <td>The shared CV gate.</td>
-              </tr>
-              <tr>
-                <td>Pitch 1…8</td>
-                <td>Inputs 2…9</td>
-                <td>One 1 V/octave input for each configured voice.</td>
-              </tr>
             </tbody>
           </table>
         </div>
+        <p>
+          Every Gate input starts at None and every CV Count starts at 0, so a
+          fresh instance is MIDI-only until CV control is explicitly connected.
+        </p>
       </section>
 
       <section class="section" id="midi">
@@ -227,6 +227,7 @@
               <tr><td>Sustain pedal</td><td>Holds released notes until pedal-up.</td></tr>
               <tr><td>Poly aftertouch</td><td>Raises Resonance and adds a little Motion per note.</td></tr>
               <tr><td>Channel pressure</td><td>Applies that pressure response across the chord.</td></tr>
+              <tr><td>Stop / panic</td><td>Stop, Reset, CC 120, and CC 123 clear every MIDI and CV voice.</td></tr>
             </tbody>
           </table>
         </div>
@@ -237,29 +238,39 @@
           <div>
             <h2>CV and gate control</h2>
             <p>
-              One shared Gate plays the current pitches together. MIDI and CV
-              use the same voice pool.
+              Up to six independent gate groups can play adjacent 1 V/octave
+              pitch buses. All groups are disconnected by default.
             </p>
           </div>
         </div>
         <div class="two-column">
           <article class="card">
-            <h3>Gate behaviour</h3>
+            <h3>Adjacent routing</h3>
             <ul>
-              <li>A rising Gate captures the current Pitch inputs.</li>
-              <li>A falling Gate releases the CV voices.</li>
-              <li>Held MIDI notes take priority when both sources need a voice.</li>
+              <li>Gate input N chooses the group’s gate bus.</li>
+              <li>Gate N CV count reserves 0–11 voices.</li>
+              <li>Pitch buses are gate +1, +2, and onward.</li>
+              <li>Input 9 with Count 2 uses pitches on Inputs 10 and 11.</li>
             </ul>
           </article>
           <article class="card">
-            <h3>Four-voice defaults</h3>
+            <h3>Gate and sample &amp; hold</h3>
             <ul>
-              <li>Input 1: Gate</li>
-              <li>Inputs 2–5: Pitch 1–4</li>
-              <li>More voices add Pitch inputs up to Input 9.</li>
+              <li>Gate rises above 1.0 V and falls below 0.5 V.</li>
+              <li>S&amp;H Off tracks pitch while the gate is high.</li>
+              <li>S&amp;H On samples pitch at each rising edge.</li>
+              <li>0 V is C3; every added volt raises pitch one octave.</li>
             </ul>
           </article>
         </div>
+        <p>
+          Counts reserve fixed voice partitions in group order; MIDI uses only
+          the unreserved voices, so MIDI and CV never steal from one another.
+          A Count increase under a held gate waits for the next rising edge,
+          while a decrease releases the removed voices. Retriggers during an
+          audible release tail resume smoothly. After Stop or panic, a held CV
+          gate must go low and rise again before restarting.
+        </p>
       </section>
 
       <section class="section" id="install">

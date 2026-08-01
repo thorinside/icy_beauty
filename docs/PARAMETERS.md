@@ -98,18 +98,42 @@ a long release easier to hear.
 
 ## Voices
 
-Choose the voice count when adding the algorithm.
+Choose the voice count when adding the algorithm. The range is 1–16 and the
+default is 8.
 
 | Voices | Useful for |
 | ---: | --- |
 | 1 | bass, melody, or an external arpeggiator |
 | 2 | intervals and duophonic lines |
-| 4 | the balanced default |
+| 4 | compact chords |
 | 6 | extended chords |
-| 8 | full polyphony and dense MIDI playing |
+| 8 | the balanced default |
+| 12 | dense chords with room for several CV voices |
+| 16 | maximum MIDI polyphony or large CV partitions |
 
 MIDI and CV share these voices. Output gain is adjusted for the selected count
 so that adding voices does not cause a large level jump.
+
+## CV/gate groups
+
+Choose 0–6 gate groups when adding the algorithm; the default is 4. Each group
+adds **Gate input N**, **Gate N CV count**, and **Gate N sample & hold**. On a
+fresh instance every Gate input is **None** and every Count is **0**, so all
+voices remain available to MIDI until CV control is explicitly connected.
+
+The pitch inputs are the buses immediately after the selected gate. If Gate 1
+uses Input 9 with Count 3, its pitches are Inputs 10, 11, and 12. Each Count is
+limited to 11 and may be further limited by the total Voices or the number of
+physical buses remaining after the gate input.
+
+The gate rises above 1.0 V and falls below 0.5 V. Sample & hold **Off** tracks
+pitch continuously while the gate is high; **On** captures all pitches on the
+rising edge. Increasing a Count under a held gate waits for the next edge.
+Decreasing a Count releases the removed voices. A retrigger during an audible
+release tail resumes smoothly from the current level.
+
+Gate groups reserve fixed voice partitions in group order. MIDI uses only the
+unreserved remainder, so MIDI and CV never steal from one another.
 
 ## Performance controls
 
@@ -121,6 +145,8 @@ so that adding voices does not cause a large level jump.
 | Sustain pedal | note hold |
 | Polyphonic aftertouch | per-note Resonance and a smaller amount of Motion |
 | Channel pressure | chord-wide Resonance and a smaller amount of Motion |
+| MIDI Stop / System Reset | clears every MIDI and CV voice |
+| CC 120 / CC 123 | All Sound Off / All Notes Off; clears every voice |
 
 These assignments are fixed. The five sound parameters can still be mapped to
 CV using the disting NT host.

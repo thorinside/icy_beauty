@@ -69,17 +69,18 @@ control interactions, and four starting patches in more detail.
 
 | Parameter | Default | Description |
 | --- | ---: | --- |
-| **Voices** | 4 | Chooses 1–8 shared voices when the algorithm is added |
+| **Voices** | 8 | Chooses 1–16 shared voices when the algorithm is added |
+| **Gate groups** | 4 | Chooses 0–6 independent CV/gate control sets when the algorithm is added |
 | **MIDI channel** | Omni | Responds to every MIDI channel, or one selected channel from 1–16 |
 | **Semitones** | 0 | Transposes MIDI and CV voices from −11 to +11 semitones |
 | **Octaves** | 0 | Transposes MIDI and CV voices from −4 to +4 octaves |
 | **Output** | Output 1 | Chooses the destination bus |
 | **Output mode** | Add | Adds Icy Beauty to the bus; **Replace** overwrites the bus instead |
-| **Gate** | Input 1 | Shared gate input for CV control |
-| **Pitch 1…8** | Inputs 2…9 | One 1 V/octave pitch input for each configured voice |
 
-MIDI and CV use the same voice pool. If all voices are busy, the algorithm
-reuses a released voice first, then the oldest held voice.
+A fresh instance is MIDI-only: every Gate input defaults to **None** and every
+CV Count defaults to **0**. Raising a Count reserves that many voices for its
+gate group. MIDI uses the unreserved voices, and MIDI and CV never steal from
+one another.
 
 ## MIDI control
 
@@ -91,24 +92,38 @@ reuses a released voice first, then the oldest held voice.
 | Sustain pedal (CC 64) | Holds released notes until the pedal is lifted |
 | Polyphonic aftertouch | Raises Resonance and adds a smaller amount of Motion to one note |
 | Channel pressure | Applies the same pressure response across the chord |
+| Stop / panic | MIDI Stop, System Reset, All Sound Off (CC 120), and All Notes Off (CC 123) clear every voice |
 
 ## CV/gate control
 
-A rising Gate plays all configured CV voices using the current Pitch inputs. A
-falling Gate releases them. Pitch follows 1 V/octave.
+Each configured gate group exposes three controls:
 
-With four voices, the default inputs are:
+- **Gate input N** chooses the gate bus.
+- **Gate N CV count** reserves 0–11 voices for that group.
+- **Gate N sample & hold** chooses tracked or sampled pitch.
+
+Pitch buses follow immediately after the selected gate bus. For example, with
+**Gate input 1 = Input 9** and **Gate 1 CV count = 2**:
 
 | Input | Function |
 | --- | --- |
-| Input 1 | Gate |
-| Input 2 | Pitch 1 |
-| Input 3 | Pitch 2 |
-| Input 4 | Pitch 3 |
-| Input 5 | Pitch 4 |
+| Input 9 | Gate 1 |
+| Input 10 | Gate 1 pitch +1 |
+| Input 11 | Gate 1 pitch +2 |
 
-Choosing more voices adds the matching Pitch inputs, up to Pitch 8 on Input 9.
-Held MIDI notes take priority if MIDI and CV need the same voice.
+Pitch tracks 1 V/octave, with 0 V at C3. With sample & hold **Off**, pitches
+track while the gate is high. With it **On**, pitches are captured on each
+rising edge and held until the next edge.
+
+Gate detection rises above 1.0 V and falls below 0.5 V. Increasing a Count
+while its gate is already high waits for the next rising edge; decreasing a
+Count releases the removed voices. Counts are limited by the selected Voices,
+the 11-CV group maximum, and the physical buses following the gate input.
+A new rising edge during an audible release tail resumes the voice smoothly
+from its current level.
+
+After a MIDI stop or panic, a gate that is still high must go low and rise
+again before its CV voices restart.
 
 ## Install
 
