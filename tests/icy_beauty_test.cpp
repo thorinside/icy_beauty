@@ -195,6 +195,10 @@ bool allVoicesUnused(const HostInstance& host) {
     return true;
 }
 
+double frequencyForPhaseIncrement(uint32_t increment) {
+    return increment * (48000.0 / 4294967296.0);
+}
+
 bool allFiniteAndBounded(const std::vector<float>& busses, int frames,
                          float* peak) {
     const float* output = busses.data() + 12 * frames;
@@ -516,6 +520,53 @@ int testSampleAndHold(const _NT_factory* factory) {
     return 0;
 }
 
+int testPitchCvCalibration() {
+    static const double kZeroVoltFrequencyHz = 130.8127826502993;
+    static const float kTestVolts[] = {
+        -5.0f, -2.0f, -1.0f, 0.0f, 0.5f, 1.0f, 2.0f, 4.0f, 7.0f,
+    };
+
+    for (std::size_t index = 0; index < ARRAY_SIZE(kTestVolts); ++index) {
+        const double expected =
+            kZeroVoltFrequencyHz * std::pow(2.0, kTestVolts[index]);
+        const double actual = frequencyForPhaseIncrement(
+            phaseIncrementForPitchCv(kTestVolts[index]));
+        const double centsError =
+            1200.0 * std::log2(actual / expected);
+        if (std::fabs(centsError) > 0.01) {
+            std::fprintf(stderr,
+                         "FAIL: %.2f V produced %.9f Hz instead of %.9f Hz "
+                         "(%.6f cents)\n",
+                         kTestVolts[index], actual, expected, centsError);
+            return 1;
+        }
+    }
+
+    const double zeroVolts = frequencyForPhaseIncrement(
+        phaseIncrementForPitchCv(0.0f));
+    const double oneVolt = frequencyForPhaseIncrement(
+        phaseIncrementForPitchCv(1.0f));
+    const double minusOneVolt = frequencyForPhaseIncrement(
+        phaseIncrementForPitchCv(-1.0f));
+    if (std::fabs(oneVolt / zeroVolts - 2.0) > 0.000001 ||
+        std::fabs(zeroVolts / minusOneVolt - 2.0) > 0.000001 ||
+        phaseIncrementForPitchCv(0.0f) != phaseIncrementForNote(48))
+        return fail("Pitch CV does not preserve exact 1 V/octave octave ratios");
+
+    if (phaseIncrementForPitchCv(-9.0f) !=
+            phaseIncrementForPitchCv(-8.0f) ||
+        phaseIncrementForPitchCv(9.0f) !=
+            phaseIncrementForPitchCv(8.0f) ||
+        frequencyForPhaseIncrement(phaseIncrementForPitchCv(8.0f)) >=
+            48000.0 * 0.5)
+        return fail("Pitch CV safety clamping is not bounded below Nyquist");
+
+    std::puts(
+        "PASS: Pitch CV tracks 1 V/oct from -5 V through +7 V within "
+        "0.01 cent, with 0 V at MIDI note 48 and safe endpoint clamping");
+    return 0;
+}
+
 int testTargetPitchRoutingAndMidiStop(const _NT_factory* factory) {
     int result = 0;
     const int frames = 64;
@@ -809,6 +860,8 @@ int main(int argc, char** argv) {
     if (testGateGroups(factory) != 0)
         return 1;
     if (testSampleAndHold(factory) != 0)
+        return 1;
+    if (testPitchCvCalibration() != 0)
         return 1;
     if (testTargetPitchRoutingAndMidiStop(factory) != 0)
         return 1;
