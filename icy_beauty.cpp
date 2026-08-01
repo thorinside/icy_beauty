@@ -15,10 +15,12 @@ enum {
     kNumCommonParameters = 3,
     kParametersPerGroup = 3,
     kNumSoundParameters = 5,
+    kNumPitchOffsetParameters = 2,
     kMaxParameters = kNumCommonParameters +
                      kMaxGateGroups * kParametersPerGroup +
                      kNumSoundParameters +
-                     kMaxGateGroups * kMaxCvPerGate,
+                     kMaxGateGroups * kMaxCvPerGate +
+                     kNumPitchOffsetParameters,
 };
 
 static const float kOutputPeakVolts = 5.0f;
@@ -38,6 +40,11 @@ enum SoundParameter {
     kSoundGrain,
     kSoundResonance,
     kSoundRelease,
+};
+
+enum PitchOffsetParameter {
+    kOffsetSemitones,
+    kOffsetOctaves,
 };
 
 enum Parameter {
@@ -169,6 +176,15 @@ static const _NT_parameter kSoundParameters[kNumSoundParameters] = {
       .unit = kNT_unitPercent, .scaling = 0, .enumStrings = NULL },
 };
 
+static const _NT_parameter
+    kPitchOffsetParameters[kNumPitchOffsetParameters] = {
+        { .name = "Semitones", .min = -11, .max = 11, .def = 0,
+          .unit = kNT_unitSemitones, .scaling = 0,
+          .enumStrings = NULL },
+        { .name = "Octaves", .min = -4, .max = 4, .def = 0,
+          .unit = kNT_unitNone, .scaling = 0, .enumStrings = NULL },
+};
+
 int groupGateParameter(uint8_t group) {
     return kParamGroupFirst + group * kParametersPerGroup;
 }
@@ -229,11 +245,22 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
             }
         }
 
+        pitchOffsetParameterFirst =
+            pitchRoutingParameterFirst +
+            gateGroupCount * pitchRoutingCount;
+        for (uint8_t offset = 0; offset < kNumPitchOffsetParameters;
+             ++offset) {
+            copyParameter(parameterDefs[pitchOffsetParameterFirst + offset],
+                          kPitchOffsetParameters[offset]);
+        }
+
         setupPageParams[0] = kParamMidiChannel;
+        setupPageParams[1] = pitchOffsetParameter(kOffsetSemitones);
+        setupPageParams[2] = pitchOffsetParameter(kOffsetOctaves);
         routingPageParams[0] = kParamOutput;
         routingPageParams[1] = kParamOutputMode;
 
-        setPage(pageDefs[0], "Setup", setupPageParams, 1);
+        setPage(pageDefs[0], "Setup", setupPageParams, 3);
         setPage(pageDefs[1], "Sound", soundPageParams,
                 kNumSoundParameters);
         setPage(pageDefs[2], "CV/Gate", cvPageParams, cvPageCount);
@@ -307,6 +334,15 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
                group * pitchRoutingCount + ordinal;
     }
 
+    int pitchOffsetParameter(PitchOffsetParameter offset) const {
+        return pitchOffsetParameterFirst + static_cast<int>(offset);
+    }
+
+    int pitchOffsetSemitones() const {
+        return v[pitchOffsetParameter(kOffsetSemitones)] +
+               12 * v[pitchOffsetParameter(kOffsetOctaves)];
+    }
+
     float soundValue(SoundParameter control) const {
         return v[soundParameter(control)] * 0.01f;
     }
@@ -363,11 +399,12 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
     uint8_t soundParameterFirst;
     uint8_t pitchRoutingParameterFirst;
     uint8_t pitchRoutingCount;
+    uint8_t pitchOffsetParameterFirst;
     bool updatingParameter;
     _NT_parameter parameterDefs[kMaxParameters];
     _NT_parameterPages pagesDef;
     _NT_parameterPage pageDefs[4];
-    uint8_t setupPageParams[1];
+    uint8_t setupPageParams[3];
     uint8_t soundPageParams[kNumSoundParameters];
     uint8_t cvPageParams[kMaxGateGroups * kParametersPerGroup];
     uint8_t routingPageParams[2];
@@ -414,7 +451,8 @@ void calculateRequirements(_NT_algorithmRequirements& requirements,
             : static_cast<uint8_t>(kMaxCvPerGate);
     requirements.numParameters =
         kNumCommonParameters + gateGroups * kParametersPerGroup +
-        kNumSoundParameters + gateGroups * pitchRoutingCount;
+        kNumSoundParameters + gateGroups * pitchRoutingCount +
+        kNumPitchOffsetParameters;
     requirements.sram = sizeof(IcyBeautyAlgorithm);
     requirements.dram = 0;
     requirements.dtc = sizeof(IcyBeautyDtc);
@@ -529,20 +567,41 @@ float pitchBendScale(uint16_t bend) {
     return exp2f(normalized * (2.0f / 12.0f));
 }
 
-void startVoice(IcyBeautyDtc* dtc, Voice& voice, uint8_t source,
+uint32_t scaledPhaseIncrement(uint32_t increment, float scale) {
+    const uint32_t sampleRate = NT_globals.sampleRate == 0
+                                    ? 48000U
+                                    : NT_globals.sampleRate;
+    const uint32_t maximum = phaseIncrementForFrequency(
+        static_cast<float>(sampleRate) * 0.49f);
+    const double scaled = increment * static_cast<double>(scale);
+    if (scaled >= maximum)
+        return maximum;
+    if (scaled <= 0.0)
+        return 0;
+    return static_cast<uint32_t>(scaled);
+}
+
+void updateVoicePitch(IcyBeautyAlgorithm* algorithm, Voice& voice) {
+    float scale = exp2f(
+        algorithm->pitchOffsetSemitones() * (1.0f / 12.0f));
+    if (voice.source == kVoiceMidi)
+        scale *= algorithm->dtc->pitchBendScale[voice.channel];
+    voice.phaseIncrement = scaledPhaseIncrement(
+        voice.basePhaseIncrement, scale);
+}
+
+void startVoice(IcyBeautyAlgorithm* algorithm, Voice& voice,
+                uint8_t source,
                 uint8_t channel, uint8_t note,
                 uint32_t basePhaseIncrement, float velocity,
                 uint8_t cvGroup = 0xffU, uint8_t cvOrdinal = 0xffU,
                 bool keyHeld = true, bool gate = true) {
+    IcyBeautyDtc* dtc = algorithm->dtc;
     voice.fundamentalPhase = 0;
     voice.glassPhase = 0x40000000U;
     voice.shimmerPhase = 0x80000000U;
     voice.basePhaseIncrement = basePhaseIncrement;
-    voice.phaseIncrement = source == kVoiceMidi
-                               ? static_cast<uint32_t>(
-                                     basePhaseIncrement *
-                                     dtc->pitchBendScale[channel])
-                               : basePhaseIncrement;
+    voice.phaseIncrement = basePhaseIncrement;
     voice.age = ++dtc->nextAge;
     voice.motionPhase = 0x9e3779b9U * voice.age;
     voice.noiseState = 0x6d2b79f5U ^ (voice.age * 0x85ebca6bU) ^ note;
@@ -564,6 +623,7 @@ void startVoice(IcyBeautyDtc* dtc, Voice& voice, uint8_t source,
     voice.fastRelease = false;
     voice.pendingStart = false;
     voice.pendingSource = kVoiceUnused;
+    updateVoicePitch(algorithm, voice);
 }
 
 void queueVoiceStart(Voice& voice, uint8_t source, uint8_t channel,
@@ -668,7 +728,7 @@ void beginMidiNote(IcyBeautyAlgorithm* algorithm, Voice& voice,
     const float level = velocity * (1.0f / 127.0f);
     if (voice.source == kVoiceUnused ||
         voice.envelope <= kSafeContribution) {
-        startVoice(algorithm->dtc, voice, kVoiceMidi, channel, note,
+        startVoice(algorithm, voice, kVoiceMidi, channel, note,
                    increment, level);
     } else {
         voice.age = ++algorithm->dtc->nextAge;
@@ -685,10 +745,8 @@ void setPitchBend(IcyBeautyAlgorithm* algorithm, uint8_t channel,
          index < algorithm->voiceCount; ++index) {
         Voice& voice = algorithm->dtc->voices[index];
         if (voice.source == kVoiceMidi && voice.channel == channel &&
-            !voice.pendingStart) {
-            voice.phaseIncrement = static_cast<uint32_t>(
-                voice.basePhaseIncrement * scale);
-        }
+            !voice.pendingStart)
+            updateVoicePitch(algorithm, voice);
     }
 }
 
@@ -972,6 +1030,15 @@ void parameterChanged(_NT_algorithm* self, int parameter) {
     refreshCountDefinitions(algorithm);
     syncPitchRoutingParameters(algorithm);
     reconcileConfiguration(algorithm);
+    if (parameter ==
+            algorithm->pitchOffsetParameter(kOffsetSemitones) ||
+        parameter == algorithm->pitchOffsetParameter(kOffsetOctaves)) {
+        for (uint8_t index = 0; index < algorithm->voiceCount; ++index) {
+            Voice& voice = algorithm->dtc->voices[index];
+            if (voice.source != kVoiceUnused)
+                updateVoicePitch(algorithm, voice);
+        }
+    }
     algorithm->updatingParameter = false;
 }
 
@@ -990,14 +1057,14 @@ void startCvVoice(IcyBeautyAlgorithm* algorithm, uint8_t group,
             queueVoiceStart(*voice, kVoiceCv, 0, 0, increment, 0.8f,
                             group, ordinal, false);
         } else if (voice->envelope <= kSafeContribution) {
-            startVoice(algorithm->dtc, *voice, kVoiceCv, 0, 0,
+            startVoice(algorithm, *voice, kVoiceCv, 0, 0,
                        increment, 0.8f, group, ordinal, false, true);
         } else {
             // Retrigger the same logical voice from its current release
             // level. Resetting its envelope, phases, and filter state here
             // creates a discontinuity whenever the release tail is audible.
             voice->basePhaseIncrement = increment;
-            voice->phaseIncrement = increment;
+            updateVoicePitch(algorithm, *voice);
             voice->gate = true;
             voice->fastRelease = false;
         }
@@ -1022,7 +1089,7 @@ void startCvVoice(IcyBeautyAlgorithm* algorithm, uint8_t group,
     }
     if (voice->source == kVoiceUnused ||
         voice->envelope <= kSafeContribution) {
-        startVoice(algorithm->dtc, *voice, kVoiceCv, 0, 0,
+        startVoice(algorithm, *voice, kVoiceCv, 0, 0,
                    increment, 0.8f, group, ordinal, false, true);
     } else {
         queueVoiceStart(*voice, kVoiceCv, 0, 0, increment, 0.8f,
@@ -1055,7 +1122,7 @@ void trackCvGroup(IcyBeautyAlgorithm* algorithm, uint8_t group,
         const int pitchBus = gateBus + ordinal + 1;
         voice->basePhaseIncrement = phaseIncrementForPitchCv(
             busValue(busFrames, numFrames, pitchBus, frame));
-        voice->phaseIncrement = voice->basePhaseIncrement;
+        updateVoicePitch(algorithm, *voice);
     }
 }
 
@@ -1119,7 +1186,7 @@ void finishFastRelease(IcyBeautyAlgorithm* algorithm, Voice& voice,
     const bool keyHeld = voice.pendingKeyHeld;
     const bool gate = source == kVoiceCv || keyHeld ||
                       algorithm->dtc->sustainPedal[channel];
-    startVoice(algorithm->dtc, voice, source, channel, note, increment,
+    startVoice(algorithm, voice, source, channel, note, increment,
                velocity, group, ordinal, keyHeld, gate);
 }
 

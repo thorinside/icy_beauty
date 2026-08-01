@@ -71,6 +71,8 @@ control interactions, and four starting patches in more detail.
 | --- | ---: | --- |
 | **Voices** | 4 | Chooses 1–8 shared voices when the algorithm is added |
 | **MIDI channel** | Omni | Responds to every MIDI channel, or one selected channel from 1–16 |
+| **Semitones** | 0 | Transposes MIDI and CV voices from −11 to +11 semitones |
+| **Octaves** | 0 | Transposes MIDI and CV voices from −4 to +4 octaves |
 | **Output** | Output 1 | Chooses the destination bus |
 | **Output mode** | Add | Adds Icy Beauty to the bus; **Replace** overwrites the bus instead |
 | **Gate** | Input 1 | Shared gate input for CV control |

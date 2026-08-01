@@ -125,6 +125,12 @@ so that adding voices does not cause a large level jump.
 These assignments are fixed. The five sound parameters can still be mapped to
 CV using the disting NT host.
 
+The Setup page also has two global pitch offsets. **Semitones** shifts every
+MIDI and CV voice from −11 to +11 semitones, and **Octaves** shifts them from
+−4 to +4 octaves. Both default to zero and update held notes immediately. With
+Sample & hold enabled, the sampled input CV remains held while either global
+offset can still be changed.
+
 ## Four starting patches
 
 | Patch | Tone | Motion | Grain | Resonance | Release | Sound |

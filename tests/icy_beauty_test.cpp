@@ -166,6 +166,14 @@ Voice* cvVoice(HostInstance& host, uint8_t group, uint8_t ordinal) {
     return findCvVoice(host.synth(), group, ordinal);
 }
 
+int semitoneOffsetParameter(const HostInstance& host) {
+    return static_cast<int>(host.requirements.numParameters) - 2;
+}
+
+int octaveOffsetParameter(const HostInstance& host) {
+    return semitoneOffsetParameter(host) + 1;
+}
+
 bool declaresCvInput(const HostInstance& host, int bus) {
     for (uint32_t parameter = 0;
          parameter < host.requirements.numParameters; ++parameter) {
@@ -233,7 +241,7 @@ int testFactoryAndSurface(const _NT_factory* factory) {
             const uint32_t expectedParameters =
                 kNumCommonParameters +
                 groupCount * kParametersPerGroup +
-                kNumSoundParameters + groupCount * pitchRoutingCount;
+                kNumSoundParameters + groupCount * pitchRoutingCount + 2;
             if (host.requirements.numParameters != expectedParameters ||
                 host.requirements.dram != 0 ||
                 host.requirements.dtc != sizeof(IcyBeautyDtc) ||
@@ -244,9 +252,30 @@ int testFactoryAndSurface(const _NT_factory* factory) {
             const _NT_parameterPages* pages =
                 host.algorithm->parameterPages;
             if (pages == NULL || pages->numPages != 4 ||
+                pages->pages[0].numParams != 3 ||
                 pages->pages[2].numParams !=
                     groupCount * kParametersPerGroup)
-                return fail("CV/Gate page does not match Gate groups");
+                return fail("parameter pages do not match Setup and Gate groups");
+
+            const int semitones = semitoneOffsetParameter(host);
+            const int octaves = octaveOffsetParameter(host);
+            if (pages->pages[0].params[0] != kParamMidiChannel ||
+                pages->pages[0].params[1] != semitones ||
+                pages->pages[0].params[2] != octaves ||
+                std::strcmp(host.algorithm->parameters[semitones].name,
+                            "Semitones") != 0 ||
+                host.algorithm->parameters[semitones].min != -11 ||
+                host.algorithm->parameters[semitones].max != 11 ||
+                host.algorithm->parameters[semitones].def != 0 ||
+                host.algorithm->parameters[semitones].unit !=
+                    kNT_unitSemitones ||
+                std::strcmp(host.algorithm->parameters[octaves].name,
+                            "Octaves") != 0 ||
+                host.algorithm->parameters[octaves].min != -4 ||
+                host.algorithm->parameters[octaves].max != 4 ||
+                host.algorithm->parameters[octaves].def != 0 ||
+                host.algorithm->parameters[octaves].unit != kNT_unitNone)
+                return fail("Setup pitch offsets are missing or malformed");
 
             for (int group = 0; group < groupCount; ++group) {
                 const int gate = groupGateParameter(group);
@@ -626,6 +655,66 @@ int testPitchCvCalibration() {
     return 0;
 }
 
+int testPitchOffsets(const _NT_factory* factory) {
+    HostInstance midi(factory, 1, 0);
+    factory->midiMessage(midi.algorithm, 0x90, 48, 100);
+    Voice& midiVoice = midi.synth()->dtc->voices[0];
+    const double midiBase = frequencyForPhaseIncrement(
+        midiVoice.phaseIncrement);
+    midi.setParameter(semitoneOffsetParameter(midi), 7);
+    midi.setParameter(octaveOffsetParameter(midi), 1);
+    const double midiExpected = midiBase * std::pow(2.0, 19.0 / 12.0);
+    const double midiCents = 1200.0 * std::log2(
+        frequencyForPhaseIncrement(midiVoice.phaseIncrement) /
+        midiExpected);
+    if (std::fabs(midiCents) > 0.01)
+        return fail("Setup pitch offsets did not transpose a held MIDI voice");
+
+    const int frames = 64;
+    HostInstance cv(factory, 1, 1);
+    cv.setParameter(groupGateParameter(0), 1);
+    cv.setParameter(groupCountParameter(0), 1);
+    cv.setParameter(groupSampleHoldParameter(0), 1);
+    std::vector<float> busses = makeBusses(frames);
+    fillBus(busses, frames, 1, 5.0f);
+    fillBus(busses, frames, 2, 0.0f);
+    cv.render(busses, frames);
+    Voice* cvPitch = cvVoice(cv, 0, 0);
+    const double cvBase = frequencyForPhaseIncrement(
+        cvPitch->phaseIncrement);
+
+    cv.setParameter(semitoneOffsetParameter(cv), -5);
+    cv.setParameter(octaveOffsetParameter(cv), -1);
+    const double cvExpected = cvBase * std::pow(2.0, -17.0 / 12.0);
+    const double cvCents = 1200.0 * std::log2(
+        frequencyForPhaseIncrement(cvPitch->phaseIncrement) / cvExpected);
+    if (std::fabs(cvCents) > 0.01)
+        return fail("Setup pitch offsets did not transpose held S&H CV");
+
+    const uint32_t offsetHeld = cvPitch->phaseIncrement;
+    fillBus(busses, frames, 2, 1.0f);
+    cv.render(busses, frames);
+    if (cvPitch->phaseIncrement != offsetHeld)
+        return fail("S&H did not hold input CV after a Setup offset change");
+
+    fillBus(busses, frames, 1, 0.0f);
+    cv.render(busses, frames);
+    fillBus(busses, frames, 1, 5.0f);
+    cv.render(busses, frames);
+    const double retriggerExpected =
+        cvBase * std::pow(2.0, 1.0 - 17.0 / 12.0);
+    const double retriggerCents = 1200.0 * std::log2(
+        frequencyForPhaseIncrement(cvPitch->phaseIncrement) /
+        retriggerExpected);
+    if (std::fabs(retriggerCents) > 0.01)
+        return fail("S&H retrigger did not combine input CV and Setup offsets");
+
+    std::puts(
+        "PASS: Semitones and Octaves transpose held MIDI and CV voices "
+        "while S&H continues to hold only its input CV");
+    return 0;
+}
+
 int testTargetPitchRoutingAndMidiStop(const _NT_factory* factory) {
     int result = 0;
     const int frames = 64;
@@ -923,6 +1012,8 @@ int main(int argc, char** argv) {
     if (testCvRetriggerDeclick(factory) != 0)
         return 1;
     if (testPitchCvCalibration() != 0)
+        return 1;
+    if (testPitchOffsets(factory) != 0)
         return 1;
     if (testTargetPitchRoutingAndMidiStop(factory) != 0)
         return 1;
