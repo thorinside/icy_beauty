@@ -166,6 +166,35 @@ Voice* cvVoice(HostInstance& host, uint8_t group, uint8_t ordinal) {
     return findCvVoice(host.synth(), group, ordinal);
 }
 
+bool declaresCvInput(const HostInstance& host, int bus) {
+    for (uint32_t parameter = 0;
+         parameter < host.requirements.numParameters; ++parameter) {
+        if (host.algorithm->parameters[parameter].unit == kNT_unitCvInput &&
+            host.values[parameter] == bus)
+            return true;
+    }
+    return false;
+}
+
+void renderUsingDeclaredInputs(HostInstance& host,
+                               const std::vector<float>& sourceBusses,
+                               int frames) {
+    std::vector<float> routedBusses = sourceBusses;
+    for (int bus = 1; bus <= 12; ++bus) {
+        if (!declaresCvInput(host, bus))
+            fillBus(routedBusses, frames, bus, 0.0f);
+    }
+    host.render(routedBusses, frames);
+}
+
+bool allVoicesUnused(const HostInstance& host) {
+    for (uint8_t index = 0; index < host.synth()->voiceCount; ++index) {
+        if (host.synth()->dtc->voices[index].source != kVoiceUnused)
+            return false;
+    }
+    return true;
+}
+
 bool allFiniteAndBounded(const std::vector<float>& busses, int frames,
                          float* peak) {
     const float* output = busses.data() + 12 * frames;
@@ -195,10 +224,12 @@ int testFactoryAndSurface(const _NT_factory* factory) {
         for (int groupCount = 0; groupCount <= kMaxGateGroups;
              ++groupCount) {
             HostInstance host(factory, voiceChoice, groupCount);
+            const int pitchRoutingCount =
+                std::min(voiceChoice, static_cast<int>(kMaxCvPerGate));
             const uint32_t expectedParameters =
                 kNumCommonParameters +
                 groupCount * kParametersPerGroup +
-                kNumSoundParameters;
+                kNumSoundParameters + groupCount * pitchRoutingCount;
             if (host.requirements.numParameters != expectedParameters ||
                 host.requirements.dram != 0 ||
                 host.requirements.dtc != sizeof(IcyBeautyDtc) ||
@@ -231,6 +262,16 @@ int testFactoryAndSurface(const _NT_factory* factory) {
                     host.algorithm->parameters[sampleHold].unit !=
                         kNT_unitEnum)
                     return fail("a gate group is not safe and disconnected by default");
+                for (int ordinal = 0; ordinal < pitchRoutingCount;
+                     ++ordinal) {
+                    const int routing = host.synth()->pitchRoutingParameter(
+                        static_cast<uint8_t>(group),
+                        static_cast<uint8_t>(ordinal));
+                    if (host.values[routing] != 0 ||
+                        host.algorithm->parameters[routing].unit !=
+                            kNT_unitCvInput)
+                        return fail("a derived pitch bus is not safely disconnected by default");
+                }
             }
         }
     }
@@ -475,6 +516,112 @@ int testSampleAndHold(const _NT_factory* factory) {
     return 0;
 }
 
+int testTargetPitchRoutingAndMidiStop(const _NT_factory* factory) {
+    int result = 0;
+    const int frames = 64;
+    HostInstance pitch(factory, 4, 2);
+    pitch.setParameter(groupGateParameter(0), 9);
+    pitch.setParameter(groupCountParameter(0), 3);
+    std::vector<float> pitchBusses = makeBusses(frames);
+    fillBus(pitchBusses, frames, 9, 5.0f);
+    fillBus(pitchBusses, frames, 10, 0.0f);
+    fillBus(pitchBusses, frames, 11, 0.5f);
+    fillBus(pitchBusses, frames, 12, 1.0f);
+    renderUsingDeclaredInputs(pitch, pitchBusses, frames);
+    const float expectedPitchVolts[3] = {0.0f, 0.5f, 1.0f};
+    for (uint8_t ordinal = 0; ordinal < 3; ++ordinal) {
+        Voice* voice = cvVoice(pitch, 0, ordinal);
+        const int pitchBus = 10 + ordinal;
+        if (!declaresCvInput(pitch, pitchBus) || voice == NULL ||
+            voice->phaseIncrement !=
+                phaseIncrementForPitchCv(expectedPitchVolts[ordinal])) {
+            std::fprintf(
+                stderr,
+                "FAIL: Gate Input 9 Count 3 did not declare and play "
+                "independent pitches from Inputs 10, 11, and 12\n");
+            result = 1;
+            break;
+        }
+    }
+
+    Voice* voice = cvVoice(pitch, 0, 0);
+    const uint32_t zeroVoltIncrement = voice == NULL ? 0 : voice->phaseIncrement;
+    fillBus(pitchBusses, frames, 10, 1.0f);
+    renderUsingDeclaredInputs(pitch, pitchBusses, frames);
+    voice = cvVoice(pitch, 0, 0);
+    if (voice == NULL || voice->phaseIncrement == zeroVoltIncrement ||
+        voice->phaseIncrement != phaseIncrementForPitchCv(1.0f)) {
+        std::fprintf(
+            stderr,
+            "FAIL: a declared pitch bus did not track while its gate was "
+            "held\n");
+        result = 1;
+    }
+
+    pitch.setParameter(groupCountParameter(0), 1);
+    if (declaresCvInput(pitch, 11) || declaresCvInput(pitch, 12)) {
+        std::fprintf(stderr,
+                     "FAIL: reducing Count did not remove inactive pitch "
+                     "dependencies from host routing\n");
+        result = 1;
+    }
+
+    HostInstance stop(factory, 4, 1);
+    stop.setParameter(groupGateParameter(0), 1);
+    stop.setParameter(groupCountParameter(0), 1);
+    std::vector<float> stopBusses = makeBusses(frames);
+    fillBus(stopBusses, frames, 1, 5.0f);
+    fillBus(stopBusses, frames, 2, 0.0f);
+    stop.render(stopBusses, frames);
+    factory->midiMessage(stop.algorithm, 0x90, 60, 100);
+    factory->midiMessage(stop.algorithm, 0x90, 64, 100);
+    if (factory->midiRealtime == NULL) {
+        std::fprintf(stderr,
+                     "FAIL: MIDI Stop has no callback to reset all voices\n");
+        result = 1;
+    } else {
+        factory->midiRealtime(stop.algorithm, 0xfcU);
+        if (!allVoicesUnused(stop) ||
+            !stop.synth()->dtc->groups[0].high) {
+            std::fprintf(stderr,
+                         "FAIL: MIDI Stop did not reset every voice and wait "
+                         "for a fresh CV gate edge\n");
+            result = 1;
+        }
+        stop.render(stopBusses, frames);
+        if (!allVoicesUnused(stop)) {
+            std::fprintf(stderr,
+                         "FAIL: a held CV gate immediately defeated MIDI "
+                         "Stop\n");
+            result = 1;
+        }
+        fillBus(stopBusses, frames, 1, 0.0f);
+        stop.render(stopBusses, frames);
+        fillBus(stopBusses, frames, 1, 5.0f);
+        stop.render(stopBusses, frames);
+        if (cvVoice(stop, 0, 0) == NULL) {
+            std::fprintf(stderr,
+                         "FAIL: CV did not resume on a fresh gate edge after "
+                         "MIDI Stop\n");
+            result = 1;
+        }
+    }
+
+    factory->midiMessage(stop.algorithm, 0xb0U, 123U, 0U);
+    if (!allVoicesUnused(stop)) {
+        std::fprintf(stderr,
+                     "FAIL: MIDI All Notes Off did not reset every voice\n");
+        result = 1;
+    }
+
+    if (result == 0) {
+        std::puts(
+            "PASS: Count-driven pitch busses are declared to host routing, "
+            "and MIDI stop/panic resets every voice");
+    }
+    return result;
+}
+
 int testSixInputPairs(const _NT_factory* factory) {
     const int frames = 64;
     HostInstance host(factory, 16, 6);
@@ -633,6 +780,7 @@ int main(int argc, char** argv) {
         factory->construct == NULL ||
         factory->parameterChanged == NULL ||
         factory->step == NULL ||
+        factory->midiRealtime == NULL ||
         factory->midiMessage == NULL)
         return fail("factory is missing a required callback");
 
@@ -645,6 +793,8 @@ int main(int argc, char** argv) {
     if (testGateGroups(factory) != 0)
         return 1;
     if (testSampleAndHold(factory) != 0)
+        return 1;
+    if (testTargetPitchRoutingAndMidiStop(factory) != 0)
         return 1;
     if (testSixInputPairs(factory) != 0)
         return 1;

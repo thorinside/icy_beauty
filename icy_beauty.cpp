@@ -17,7 +17,8 @@ enum {
     kNumSoundParameters = 5,
     kMaxParameters = kNumCommonParameters +
                      kMaxGateGroups * kParametersPerGroup +
-                     kNumSoundParameters,
+                     kNumSoundParameters +
+                     kMaxGateGroups * kMaxCvPerGate,
 };
 
 static const float kOutputPeakVolts = 5.0f;
@@ -121,6 +122,34 @@ static const char* const kSampleHoldNames[kMaxGateGroups] = {
     "Gate 5 sample & hold", "Gate 6 sample & hold",
 };
 
+#define STRINGIFY_DETAIL(value) #value
+#define STRINGIFY(value) STRINGIFY_DETAIL(value)
+#define GATE_PITCH_ROUTING_NAMES(group)                                  \
+    {                                                                   \
+        "Gate " STRINGIFY(group) " pitch +1",                          \
+        "Gate " STRINGIFY(group) " pitch +2",                          \
+        "Gate " STRINGIFY(group) " pitch +3",                          \
+        "Gate " STRINGIFY(group) " pitch +4",                          \
+        "Gate " STRINGIFY(group) " pitch +5",                          \
+        "Gate " STRINGIFY(group) " pitch +6",                          \
+        "Gate " STRINGIFY(group) " pitch +7",                          \
+        "Gate " STRINGIFY(group) " pitch +8",                          \
+        "Gate " STRINGIFY(group) " pitch +9",                          \
+        "Gate " STRINGIFY(group) " pitch +10",                         \
+        "Gate " STRINGIFY(group) " pitch +11",                         \
+    }
+
+static const char* const
+    kPitchRoutingNames[kMaxGateGroups][kMaxCvPerGate] = {
+        GATE_PITCH_ROUTING_NAMES(1), GATE_PITCH_ROUTING_NAMES(2),
+        GATE_PITCH_ROUTING_NAMES(3), GATE_PITCH_ROUTING_NAMES(4),
+        GATE_PITCH_ROUTING_NAMES(5), GATE_PITCH_ROUTING_NAMES(6),
+};
+
+#undef GATE_PITCH_ROUTING_NAMES
+#undef STRINGIFY
+#undef STRINGIFY_DETAIL
+
 static const _NT_parameter kCommonParameters[] = {
     NT_PARAMETER_AUDIO_OUTPUT_WITH_MODE("Output", 1, 13)
     { .name = "MIDI channel", .min = 0, .max = 16, .def = 0,
@@ -156,7 +185,11 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
     IcyBeautyAlgorithm(IcyBeautyDtc* dtcMemory, uint8_t configuredVoices,
                        uint8_t configuredGroups)
         : dtc(dtcMemory), voiceCount(configuredVoices),
-          gateGroupCount(configuredGroups), updatingParameter(false) {
+          gateGroupCount(configuredGroups),
+          pitchRoutingCount(configuredVoices < kMaxCvPerGate
+                                ? configuredVoices
+                                : static_cast<uint8_t>(kMaxCvPerGate)),
+          updatingParameter(false) {
         for (int i = 0; i < kNumCommonParameters; ++i)
             copyParameter(parameterDefs[i], kCommonParameters[i]);
 
@@ -183,6 +216,17 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
             copyParameter(parameterDefs[soundParameterFirst + control],
                           kSoundParameters[control]);
             soundPageParams[control] = soundParameterFirst + control;
+        }
+
+        pitchRoutingParameterFirst =
+            soundParameterFirst + kNumSoundParameters;
+        for (uint8_t group = 0; group < gateGroupCount; ++group) {
+            for (uint8_t ordinal = 0; ordinal < pitchRoutingCount;
+                 ++ordinal) {
+                setCvInput(
+                    parameterDefs[pitchRoutingParameter(group, ordinal)],
+                    kPitchRoutingNames[group][ordinal]);
+            }
         }
 
         setupPageParams[0] = kParamMidiChannel;
@@ -258,6 +302,11 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
         return soundParameterFirst + static_cast<int>(control);
     }
 
+    int pitchRoutingParameter(uint8_t group, uint8_t ordinal) const {
+        return pitchRoutingParameterFirst +
+               group * pitchRoutingCount + ordinal;
+    }
+
     float soundValue(SoundParameter control) const {
         return v[soundParameter(control)] * 0.01f;
     }
@@ -312,6 +361,8 @@ struct IcyBeautyAlgorithm : public _NT_algorithm {
     uint8_t voiceCount;
     uint8_t gateGroupCount;
     uint8_t soundParameterFirst;
+    uint8_t pitchRoutingParameterFirst;
+    uint8_t pitchRoutingCount;
     bool updatingParameter;
     _NT_parameter parameterDefs[kMaxParameters];
     _NT_parameterPages pagesDef;
@@ -353,11 +404,17 @@ uint8_t gateGroupCountFromSpecifications(const int32_t* specifications) {
 
 void calculateRequirements(_NT_algorithmRequirements& requirements,
                            const int32_t* specifications) {
+    const uint8_t voiceCount =
+        voiceCountFromSpecifications(specifications);
     const uint8_t gateGroups =
         gateGroupCountFromSpecifications(specifications);
+    const uint8_t pitchRoutingCount =
+        voiceCount < kMaxCvPerGate
+            ? voiceCount
+            : static_cast<uint8_t>(kMaxCvPerGate);
     requirements.numParameters =
         kNumCommonParameters + gateGroups * kParametersPerGroup +
-        kNumSoundParameters;
+        kNumSoundParameters + gateGroups * pitchRoutingCount;
     requirements.sram = sizeof(IcyBeautyAlgorithm);
     requirements.dram = 0;
     requirements.dtc = sizeof(IcyBeautyDtc);
@@ -654,6 +711,32 @@ void setSustainPedal(IcyBeautyAlgorithm* algorithm, uint8_t channel,
     }
 }
 
+void resetAllVoices(IcyBeautyAlgorithm* algorithm) {
+    IcyBeautyDtc* dtc = algorithm->dtc;
+    for (uint8_t index = 0; index < algorithm->voiceCount; ++index)
+        clearVoice(dtc->voices[index]);
+
+    for (uint8_t group = 0; group < algorithm->gateGroupCount; ++group) {
+        GateGroupState& state = dtc->groups[group];
+        state.gateBus = algorithm->v[groupGateParameter(group)];
+        state.appliedCount = algorithm->groupCount(group);
+        // A connected gate may still be high when Stop arrives. Treat it as
+        // already high so silence is retained until a fresh low-to-high edge.
+        state.high = state.gateBus > 0;
+    }
+
+    volatile uint8_t* const modWheel = dtc->modWheel;
+    volatile uint8_t* const channelPressure = dtc->channelPressure;
+    volatile bool* const sustainPedal = dtc->sustainPedal;
+    for (uint8_t channel = 0; channel < 16; ++channel) {
+        dtc->pitchBendScale[channel] = 1.0f;
+        modWheel[channel] = 0;
+        channelPressure[channel] = 0;
+        sustainPedal[channel] = false;
+    }
+    dtc->nextAge = 0;
+}
+
 void setPolyAftertouch(IcyBeautyAlgorithm* algorithm, uint8_t channel,
                        uint8_t note, uint8_t pressure) {
     for (uint8_t index = algorithm->midiStart();
@@ -715,7 +798,9 @@ void midiMessage(_NT_algorithm* self, uint8_t status, uint8_t data1,
         setPolyAftertouch(algorithm, channel, data1,
                           data2 & 0x7fU);
     } else if (message == 0xb0U) {
-        if (data1 == 1U)
+        if (data1 == 120U || data1 == 123U)
+            resetAllVoices(algorithm);
+        else if (data1 == 1U)
             algorithm->dtc->modWheel[channel] = data2 & 0x7fU;
         else if (data1 == 64U)
             setSustainPedal(algorithm, channel, data2 >= 64U);
@@ -726,6 +811,11 @@ void midiMessage(_NT_algorithm* self, uint8_t status, uint8_t data1,
                               (static_cast<uint16_t>(data2 & 0x7fU) << 7);
         setPitchBend(algorithm, channel, bend);
     }
+}
+
+void midiRealtime(_NT_algorithm* self, uint8_t byte) {
+    if (byte == 0xfcU || byte == 0xffU)
+        resetAllVoices(static_cast<IcyBeautyAlgorithm*>(self));
 }
 
 float triangle(uint32_t phase) {
@@ -821,6 +911,25 @@ void correctParameter(IcyBeautyAlgorithm* algorithm, int parameter,
     }
 }
 
+void syncPitchRoutingParameters(IcyBeautyAlgorithm* algorithm) {
+    for (uint8_t group = 0; group < algorithm->gateGroupCount; ++group) {
+        const int gateBus = algorithm->v[groupGateParameter(group)];
+        const uint8_t count = algorithm->groupCount(group);
+        for (uint8_t ordinal = 0;
+             ordinal < algorithm->pitchRoutingCount; ++ordinal) {
+            int16_t pitchBus = 0;
+            if (gateBus > 0 && ordinal < count &&
+                gateBus + ordinal + 1 <= kNT_lastBus) {
+                pitchBus = static_cast<int16_t>(gateBus + ordinal + 1);
+            }
+            correctParameter(
+                algorithm,
+                algorithm->pitchRoutingParameter(group, ordinal),
+                pitchBus);
+        }
+    }
+}
+
 void refreshCountDefinitions(IcyBeautyAlgorithm* algorithm) {
     const int32_t algorithmIndex = NT_algorithmIndex(algorithm);
     for (uint8_t group = 0; group < algorithm->gateGroupCount; ++group) {
@@ -861,6 +970,7 @@ void parameterChanged(_NT_algorithm* self, int parameter) {
     }
 
     refreshCountDefinitions(algorithm);
+    syncPitchRoutingParameters(algorithm);
     reconcileConfiguration(algorithm);
     algorithm->updatingParameter = false;
 }
@@ -1159,7 +1269,7 @@ static const _NT_factory kFactory = {
     .parameterChanged = parameterChanged,
     .step = step,
     .draw = NULL,
-    .midiRealtime = NULL,
+    .midiRealtime = midiRealtime,
     .midiMessage = midiMessage,
     .tags = kNT_tagInstrument,
     .hasCustomUi = NULL,
