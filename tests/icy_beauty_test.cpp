@@ -520,6 +520,65 @@ int testSampleAndHold(const _NT_factory* factory) {
     return 0;
 }
 
+int testCvRetriggerDeclick(const _NT_factory* factory) {
+    const int frames = 4;
+    float maximumDiscontinuity = 0.0f;
+    for (int sampleHold = 0; sampleHold <= 1; ++sampleHold) {
+        HostInstance host(factory, 1, 1);
+        host.setParameter(groupGateParameter(0), 1);
+        host.setParameter(groupCountParameter(0), 1);
+        host.setParameter(groupSampleHoldParameter(0), sampleHold);
+        host.setParameter(host.synth()->soundParameter(kSoundMotion), 0);
+        host.setParameter(host.synth()->soundParameter(kSoundGrain), 0);
+        host.setParameter(host.synth()->soundParameter(kSoundResonance), 0);
+        host.setParameter(host.synth()->soundParameter(kSoundRelease), 100);
+
+        std::vector<float> busses = makeBusses(frames);
+        fillBus(busses, frames, 1, 5.0f);
+        fillBus(busses, frames, 2, 0.0f);
+        renderBlocks(host, busses, frames, 300);
+
+        fillBus(busses, frames, 1, 0.0f);
+        float beforeRetrigger = 0.0f;
+        for (int block = 0; block < 256; ++block) {
+            std::fill(busses.begin() + 12 * frames,
+                      busses.begin() + 13 * frames, 0.0f);
+            host.render(busses, frames);
+            beforeRetrigger = busses[13 * frames - 1];
+            if (std::fabs(beforeRetrigger) > 0.2f)
+                break;
+        }
+        if (std::fabs(beforeRetrigger) <= 0.2f)
+            return fail(
+                "CV retrigger fixture did not reach an audible release tail");
+
+        fillBus(busses, frames, 1, 5.0f);
+        std::fill(busses.begin() + 12 * frames,
+                  busses.begin() + 13 * frames, 0.0f);
+        host.render(busses, frames);
+        const float afterRetrigger = busses[12 * frames];
+        const float discontinuity =
+            std::fabs(afterRetrigger - beforeRetrigger);
+        maximumDiscontinuity =
+            std::max(maximumDiscontinuity, discontinuity);
+        if (discontinuity >= 0.15f)
+            return fail(
+                "CV retrigger reset a releasing voice and introduced a click-sized discontinuity");
+
+        const Voice* voice = cvVoice(host, 0, 0);
+        if (voice == NULL || !voice->gate || voice->pendingStart ||
+            voice->fastRelease || voice->envelope <= kSafeContribution)
+            return fail(
+                "CV retrigger did not resume its release tail immediately");
+    }
+
+    std::printf(
+        "PASS: fast CV retriggers resume the release tail without latency "
+        "or a click-sized discontinuity in either S&H mode (%.3f V max)\n",
+        maximumDiscontinuity);
+    return 0;
+}
+
 int testPitchCvCalibration() {
     static const double kZeroVoltFrequencyHz = 130.8127826502993;
     static const float kTestVolts[] = {
@@ -860,6 +919,8 @@ int main(int argc, char** argv) {
     if (testGateGroups(factory) != 0)
         return 1;
     if (testSampleAndHold(factory) != 0)
+        return 1;
+    if (testCvRetriggerDeclick(factory) != 0)
         return 1;
     if (testPitchCvCalibration() != 0)
         return 1;

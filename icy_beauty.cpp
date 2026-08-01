@@ -986,8 +986,21 @@ void startCvVoice(IcyBeautyAlgorithm* algorithm, uint8_t group,
     Voice* voice = findCvVoice(algorithm, group, ordinal);
     const uint32_t increment = phaseIncrementForPitchCv(pitchVolts);
     if (voice != NULL) {
-        startVoice(algorithm->dtc, *voice, kVoiceCv, 0, 0,
-                   increment, 0.8f, group, ordinal, false, true);
+        if (voice->pendingStart) {
+            queueVoiceStart(*voice, kVoiceCv, 0, 0, increment, 0.8f,
+                            group, ordinal, false);
+        } else if (voice->envelope <= kSafeContribution) {
+            startVoice(algorithm->dtc, *voice, kVoiceCv, 0, 0,
+                       increment, 0.8f, group, ordinal, false, true);
+        } else {
+            // Retrigger the same logical voice from its current release
+            // level. Resetting its envelope, phases, and filter state here
+            // creates a discontinuity whenever the release tail is audible.
+            voice->basePhaseIncrement = increment;
+            voice->phaseIncrement = increment;
+            voice->gate = true;
+            voice->fastRelease = false;
+        }
         return;
     }
 
