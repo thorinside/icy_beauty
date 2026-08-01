@@ -614,6 +614,22 @@ int testTargetPitchRoutingAndMidiStop(const _NT_factory* factory) {
         result = 1;
     }
 
+    factory->midiMessage(stop.algorithm, 0x90U, 67U, 100U);
+    factory->midiMessage(stop.algorithm, 0xb0U, 120U, 0U);
+    if (!allVoicesUnused(stop)) {
+        std::fprintf(stderr,
+                     "FAIL: MIDI All Sound Off did not reset every voice\n");
+        result = 1;
+    }
+
+    factory->midiMessage(stop.algorithm, 0x90U, 69U, 100U);
+    factory->midiRealtime(stop.algorithm, 0xffU);
+    if (!allVoicesUnused(stop)) {
+        std::fprintf(stderr,
+                     "FAIL: MIDI System Reset did not reset every voice\n");
+        result = 1;
+    }
+
     if (result == 0) {
         std::puts(
             "PASS: Count-driven pitch busses are declared to host routing, "
