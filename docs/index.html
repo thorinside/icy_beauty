@@ -70,7 +70,7 @@
         <div class="signal-flow" aria-label="Icy Beauty signal flow">
           <div class="signal-step">
             <b>Three tone layers</b>
-            <span>A rounded main note, a quiet octave, and a high interval.</span>
+            <span>A rounded main note, a quiet near-octave, and a high interval.</span>
           </div>
           <div class="signal-step">
             <b>Tone</b>
@@ -86,7 +86,7 @@
           </div>
           <div class="signal-step">
             <b>Release</b>
-            <span>Shapes the final fade into a ±5 V output.</span>
+            <span>Shapes the final fade, limited to just under ±5 V.</span>
           </div>
         </div>
       </section>
@@ -96,8 +96,8 @@
           <div>
             <h2>Sound parameters</h2>
             <p>
-              These five normal host parameters are the complete sound surface.
-              Each can also be mapped to CV in the disting NT.
+              These are the five main sound-shaping parameters. Each can also
+              be mapped to CV in the disting NT.
             </p>
           </div>
         </div>
@@ -135,6 +135,10 @@
         </div>
         <p>
           <a href="parameters.html">Open the detailed parameter field guide →</a>
+        </p>
+        <p>
+          Motion and Resonance descriptions assume the modulation wheel and
+          pressure are at zero.
         </p>
       </section>
 
@@ -200,6 +204,11 @@
           Every Gate input starts at None and every CV Count starts at 0, so a
           fresh instance is MIDI-only until CV control is explicitly connected.
         </p>
+        <p>
+          Icy Beauty's own contribution is soft-limited to just under ±5 V,
+          beginning at ±4.5 V. In Add mode, other algorithms can take the
+          combined bus beyond that level.
+        </p>
       </section>
 
       <section class="section" id="midi">
@@ -224,10 +233,10 @@
               <tr><td>Velocity</td><td>Level, with a small brightness change.</td></tr>
               <tr><td>Pitch bend</td><td>Fixed ±2-semitone range.</td></tr>
               <tr><td>Mod wheel</td><td>Raises Motion.</td></tr>
-              <tr><td>Sustain pedal</td><td>Holds released notes until pedal-up.</td></tr>
+              <tr><td>Sustain pedal</td><td>Holds released notes until pedal-up, unless a voice must be reused.</td></tr>
               <tr><td>Poly aftertouch</td><td>Raises Resonance and adds a little Motion per note.</td></tr>
-              <tr><td>Channel pressure</td><td>Applies that pressure response across the chord.</td></tr>
-              <tr><td>Stop / panic</td><td>Stop, Reset, CC 120, and CC 123 clear every MIDI and CV voice.</td></tr>
+              <tr><td>Channel pressure</td><td>Applies that pressure response to notes on the same MIDI channel.</td></tr>
+              <tr><td>Stop / panic</td><td>Stop and Reset clear every voice; CC 120 and CC 123 do the same on an accepted channel.</td></tr>
             </tbody>
           </table>
         </div>
@@ -251,6 +260,7 @@
               <li>Gate N CV count reserves 0–11 voices.</li>
               <li>Pitch buses are gate +1, +2, and onward.</li>
               <li>Input 9 with Count 2 uses pitches on Inputs 10 and 11.</li>
+              <li>Other groups' reservations and the remaining higher bus positions can lower the Count limit.</li>
             </ul>
           </article>
           <article class="card">
@@ -259,17 +269,26 @@
               <li>Gate rises above 1.0 V and falls below 0.5 V.</li>
               <li>S&amp;H Off tracks pitch while the gate is high.</li>
               <li>S&amp;H On samples pitch at each rising edge.</li>
-              <li>0 V is C3; every added volt raises pitch one octave.</li>
+              <li>0 V is MIDI note 48 (about 130.81 Hz); +1 V raises pitch one octave.</li>
             </ul>
           </article>
         </div>
         <p>
           Counts reserve fixed voice partitions in group order; MIDI uses only
-          the unreserved voices, so MIDI and CV never steal from one another.
+          the unreserved voices. Incoming MIDI and CV notes do not steal from
+          the other partition, but editing Counts can reallocate the pool and
+          quickly fade notes that no longer fit.
           A Count increase under a held gate waits for the next rising edge,
-          while a decrease releases the removed voices. Retriggers during an
-          audible release tail resume smoothly. After Stop or panic, a held CV
-          gate must go low and rise again before restarting.
+          while a decrease fades the removed voices with an internal 5 ms
+          transition, independent of Release. Retriggers during an audible
+          release tail resume smoothly. After Stop or panic, a held CV gate
+          must go low and rise again before restarting.
+        </p>
+        <p>
+          At 48 kHz, native tests verify 1 V/octave calibration from −5 V
+          through +7 V to within 0.01 cent. Pitch CV is clamped to the −8 V to
+          +8 V range, and extreme positive values are also limited below
+          Nyquist, so the usable top end is lower at reduced sample rates.
         </p>
       </section>
 
@@ -277,15 +296,18 @@
         <div class="section-heading">
           <div>
             <h2>Install the prebuilt plug-in</h2>
-            <p>No compiler or development toolchain is needed.</p>
+            <p>
+              Requires disting NT firmware 1.15.0 or newer. No compiler or
+              development toolchain is needed.
+            </p>
           </div>
         </div>
         <article class="card">
           <h3>Three steps</h3>
           <ol>
-            <li>Download <code>icy_beauty-plugin.zip</code> from Releases.</li>
+            <li>Download <code>icy_beauty-plugin.zip</code> from <a href="https://github.com/thorinside/icy_beauty/releases">Releases</a>.</li>
             <li>Unzip it at the root of the disting NT SD card.</li>
-            <li>Rescan plug-ins and add Icy Beauty.</li>
+            <li>Restart the module or remount the card, then add Icy Beauty.</li>
           </ol>
         </article>
       </section>

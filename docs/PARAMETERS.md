@@ -18,8 +18,8 @@ the algorithm, so it is easy to learn by ear and easy to perform.
 Tone changes both brightness and the balance of the three tone layers.
 
 - The main note stays present across the full range.
-- Raising Tone adds more of the octave layer.
-- Raising it further brings the high interval forward.
+- Raising Tone brings up both the near-octave and high-interval layers.
+- The high interval grows more strongly across the range.
 - The overall sound also becomes less smoothed.
 
 Use low settings for soft basses and woody chords. Use the middle for the
@@ -32,7 +32,8 @@ Resonance turns some of that detail into a clearer ring.
 ## Motion
 
 Motion gives every active voice its own slow pitch movement. The voices do not
-move together, so held chords gently spread and close.
+move together, so held chords gently spread and close. The values below assume
+the modulation wheel and pressure are at zero.
 
 | Setting | Approximate result |
 | ---: | --- |
@@ -68,6 +69,9 @@ Tone settings, Grain makes the bright layers feel more brittle.
 
 Resonance mixes in a tuned ring that follows every played pitch.
 
+The ranges below assume pressure is at zero; aftertouch can raise Resonance
+above the panel setting.
+
 - Below 30%, it adds a small outline to the note.
 - Around 50%, it gives the factory sound its clear icy edge.
 - Above 70%, the ring becomes an obvious part of the sound.
@@ -76,7 +80,7 @@ It does not run away into self-oscillation. High values remain connected to the
 played note.
 
 Polyphonic aftertouch raises Resonance on the pressed note. Channel pressure
-raises it across the chord.
+raises it on every active note on that MIDI channel.
 
 ## Release
 
@@ -123,17 +127,27 @@ voices remain available to MIDI until CV control is explicitly connected.
 
 The pitch inputs are the buses immediately after the selected gate. If Gate 1
 uses Input 9 with Count 3, its pitches are Inputs 10, 11, and 12. Each Count is
-limited to 11 and may be further limited by the total Voices or the number of
-physical buses remaining after the gate input.
+limited to 11 and may be further limited by the voices left after the other
+groups' reservations and the available bus positions after the selected gate
+bus.
 
 The gate rises above 1.0 V and falls below 0.5 V. Sample & hold **Off** tracks
 pitch continuously while the gate is high; **On** captures all pitches on the
 rising edge. Increasing a Count under a held gate waits for the next edge.
-Decreasing a Count releases the removed voices. A retrigger during an audible
-release tail resumes smoothly from the current level.
+Decreasing a Count quickly fades the removed voices with an internal 5 ms
+transition, independent of Release. A retrigger during an audible release tail
+resumes smoothly from the current level.
 
 Gate groups reserve fixed voice partitions in group order. MIDI uses only the
-unreserved remainder, so MIDI and CV never steal from one another.
+unreserved remainder. Incoming MIDI and CV notes do not steal from the other
+partition, but editing Counts can reallocate the pool and quickly fade notes
+that no longer fit.
+
+Pitch follows 1 V/octave with 0 V at MIDI note 48 (about 130.81 Hz). At 48 kHz,
+the calibration is verified from −5 V through +7 V to within 0.01 cent.
+Pitch CV is clamped to the −8 V to +8 V range, and extreme positive values are
+also limited below Nyquist, so the usable top end is lower at reduced sample
+rates.
 
 ## Performance controls
 
@@ -142,11 +156,11 @@ unreserved remainder, so MIDI and CV never steal from one another.
 | Note velocity | level, with a smaller Tone-like brightness change |
 | Pitch bend | pitch, ±2 semitones |
 | Modulation wheel | Motion |
-| Sustain pedal | note hold |
+| Sustain pedal | holds released notes until pedal-up, unless a voice must be reused |
 | Polyphonic aftertouch | per-note Resonance and a smaller amount of Motion |
-| Channel pressure | chord-wide Resonance and a smaller amount of Motion |
+| Channel pressure | Resonance and a smaller amount of Motion on that MIDI channel |
 | MIDI Stop / System Reset | clears every MIDI and CV voice |
-| CC 120 / CC 123 | All Sound Off / All Notes Off; clears every voice |
+| CC 120 / CC 123 | All Sound Off / All Notes Off on an accepted channel; clears every voice |
 
 These assignments are fixed. The five sound parameters can still be mapped to
 CV using the disting NT host.
@@ -162,9 +176,9 @@ offset can still be changed.
 | Patch | Tone | Motion | Grain | Resonance | Release | Sound |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | **Aurora Glass** | 72 | 58 | 18 | 64 | 78 | bright layers with slow movement and a long tail |
-| **Frozen Prairie** | 38 | 32 | 24 | 42 | broad, restrained, and slightly weathered |
-| **Red Cedar Bell** | 55 | 22 | 8 | 82 | warm body with a clear tuned ring |
-| **Polar Night** | 20 | 70 | 45 | 68 | dark, moving, grainy, and spacious |
+| **Frozen Prairie** | 38 | 32 | 24 | 42 | 70 | broad, restrained, and slightly weathered |
+| **Red Cedar Bell** | 55 | 22 | 8 | 82 | 60 | warm body with a clear tuned ring |
+| **Polar Night** | 20 | 70 | 45 | 68 | 92 | dark, moving, grainy, and spacious |
 
 For simple external control, map a slow CV to Tone and an envelope to
 Resonance. Keep Grain under a knob at first; small changes around the midpoint

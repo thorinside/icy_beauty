@@ -96,9 +96,9 @@
           <div class="parameter-copy">
             <p>
               Tone changes both brightness and the balance of the three tone
-              layers. The rounded main note stays present; raising Tone adds the
-              octave, then brings the high interval forward and reduces
-              smoothing.
+              layers. The rounded main note stays present; raising Tone brings
+              up both the near-octave and high-interval layers, with the high
+              interval growing more strongly, and reduces smoothing.
             </p>
             <ul>
               <li>Low: soft basses, rounded leads, and woody chords.</li>
@@ -121,7 +121,8 @@
             <p>
               Every active voice receives its own slow pitch movement. Voices
               do not move together, so a held chord gently spreads and closes.
-              This is pitch movement, not a chorus or delay effect.
+              This is pitch movement, not a chorus or delay effect. The values
+              below assume the modulation wheel and pressure are at zero.
             </p>
             <div class="table-wrap">
               <table>
@@ -173,7 +174,8 @@
             <p>
               Resonance mixes in a pitched ring that follows every played note.
               It stays connected to the note rather than running away into
-              self-oscillation.
+              self-oscillation. The ranges below assume pressure is at zero;
+              aftertouch can raise Resonance above the panel setting.
             </p>
             <ul>
               <li>Below 30%: a small outline around the note.</li>
@@ -182,7 +184,7 @@
             </ul>
             <p>
               Polyphonic aftertouch raises Resonance on one note. Channel
-              pressure raises it across the chord.
+              pressure raises it on every active note on that MIDI channel.
             </p>
           </div>
         </article>
@@ -258,20 +260,30 @@
             <p>
               Each group’s pitch buses immediately follow its selected gate.
               Gate on Input 9 with Count 3 reads pitches from Inputs 10, 11,
-              and 12. Count is limited to 11, the remaining Voices, and the
-              physical buses after the gate input.
+              and 12. Count is limited to 11, the voices left after the other
+              groups' reservations, and the available bus positions after the
+              selected gate bus.
             </p>
             <p>
               Gates rise above 1.0 V and fall below 0.5 V. Sample &amp; hold
               Off tracks pitch while high; On captures pitch at the rising
               edge. Increasing Count under a held gate waits for the next edge,
-              while decreasing it releases the removed voices. A retrigger
-              during an audible release tail resumes smoothly.
+              while decreasing it fades the removed voices with an internal
+              5 ms transition, independent of Release. A retrigger during an
+              audible release tail resumes smoothly.
             </p>
             <p>
               Gate groups reserve fixed voice partitions in group order. MIDI
-              uses the unreserved remainder, so MIDI and CV never steal from
-              one another.
+              uses the unreserved remainder. Incoming MIDI and CV notes do not
+              steal from the other partition, but editing Counts can reallocate
+              the pool and quickly fade notes that no longer fit.
+            </p>
+            <p>
+              Pitch follows 1 V/octave with 0 V at MIDI note 48 (about
+              130.81 Hz). At 48 kHz, calibration is verified from −5 V through
+              +7 V to within 0.01 cent. Pitch CV is clamped to the −8 V to +8 V
+              range, and extreme positive values are also limited below
+              Nyquist, so the usable top end is lower at reduced sample rates.
             </p>
           </div>
         </article>
